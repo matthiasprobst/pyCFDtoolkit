@@ -1,19 +1,22 @@
 import logging
 import os
+import pathlib
 import shutil
-from pathlib import Path
+from typing import Union
 
 import dotenv
+import h5py
+import numpy as np
 from x2hdf.utils import random_tmp_filename
 
 from .. import CFX_DOTENV_FILENAME, SESSIONS_DIR
-import h5py
-import numpy as np
+
 dotenv.load_dotenv(CFX_DOTENV_FILENAME)
 
 logger = logging.getLogger('cfdtoolbox')
 
 CFX5PRE = os.environ.get("cfx5pre")
+CFX5CMDS = os.environ.get("cfx5cmds")
 
 
 class CCLFile:
@@ -30,14 +33,14 @@ class CCLFile:
     hdf_filepath = CCL_File(ccl_filename).write_to_hdf('ccltest.hdf', overwrite=True)
     """
 
-    def __init__(self, filename: str, intendation_step: int = 2):
+    def __init__(self, filename: pathlib.Path, intendation_step: int = 2):
         self.filename = filename
         self.lines = self._remove_linebreaks()
         self.indentation = self._get_indentation()
         self.root_group = CCLGroup(0, -1, indentation_length=self.indentation[0][1],
-                                    intendation_step=intendation_step,
-                                    all_lines=self.lines,
-                                    all_indentation=self.indentation, name='root', verbose=False)
+                                   intendation_step=intendation_step,
+                                   all_lines=self.lines,
+                                   all_indentation=self.indentation, name='root', verbose=False)
 
     def write_to_hdf(self, hdf_filename, overwrite=True):
         if os.path.isfile(hdf_filename):
@@ -135,7 +138,7 @@ class CCLGroup:
 
         found = []
         for i in self.all_indentation:
-            if i[0] >= self.grp_line and i[0] < self.end_line:
+            if self.grp_line <= i[0] < self.end_line:
                 if i[1] == self.indentation_length:
                     # append line number indent and
                     found.append((i[0], i[1] - 1))
@@ -145,9 +148,9 @@ class CCLGroup:
         if len(afound) > 1:
             for (a, b) in zip(found[0:], found[1:]):
                 if a[0] + 1 != b[0]:  # it's a group!
-                    _ccl_grp = CCLGroup(a[0], b[0],indentation_length=self.indentation_length + self.intendation_step,
-                                                     intendation_step=2, all_lines=self.all_lines,
-                                                     all_indentation=self.all_indentation)
+                    _ccl_grp = CCLGroup(a[0], b[0], indentation_length=self.indentation_length + self.intendation_step,
+                                        intendation_step=2, all_lines=self.all_lines,
+                                        all_indentation=self.all_indentation)
                     self.sub_groups[_ccl_grp.name] = _ccl_grp
 
     def create_h5_group(self, h5grp, root_group=False, overwrite=False):
@@ -168,7 +171,9 @@ class CCLGroup:
         grp_lines = self.get_lines()
 
         grp_ind_spaces = ' ' * self.indentation_length
-        grp_values_flag = True  # is set to false if first line in group is not an attribute of this group (no line with "=")
+
+        # is set to false if first line in group is not an attribute of this group (no line with "=")
+        grp_values_flag = True
         for line in grp_lines:
             if line[0:self.indentation_length] == grp_ind_spaces:
                 if grp_values_flag:
@@ -183,7 +188,8 @@ class CCLGroup:
             subg.create_h5_group(g, overwrite=overwrite)
 
 
-def generate(input_file: Path, ccl_filename: Path = None, cfx5pre: Path = None, overwrite: bool = True):
+def generate(input_file: Union[str, bytes, os.PathLike, pathlib.Path], ccl_filename: pathlib.Path = None,
+             cfx5pre: pathlib.Path = None, overwrite: bool = True):
     """
     Converts a cfx or def file into a ccl file.
     If no `ccl_filename` is provided the input filename is
@@ -205,22 +211,25 @@ def generate(input_file: Path, ccl_filename: Path = None, cfx5pre: Path = None, 
     ccl_filename : `Path`
         Path to generated ccl file
     """
-    if not isinstance(input_file, Path):
-        input_file = Path(input_file)
+    if not isinstance(input_file, pathlib.Path):
+        input_file = pathlib.Path(input_file)
 
     if input_file.suffix not in ('.cfx', '.res', '.def'):
         raise ValueError('Please provide a ANSYS CFX file.')
 
     if ccl_filename is None:
-        ccl_filename = Path.joinpath(input_file.parent, f'{input_file.stem}.ccl')
+        ccl_filename = pathlib.Path.joinpath(input_file.parent, f'{input_file.stem}.ccl')
     logger.debug(f'*.ccl input_file: {ccl_filename}')
 
     if input_file in ('cfx', '.res'):
-        return generate_from_res_or_cfx(input_file, ccl_filename, CFX5PRE)
+        if cfx5pre is None:
+            cfx5pre = CFX5PRE
+        return generate_from_res_or_cfx(input_file, ccl_filename,
+                                        cfx5pre=cfx5pre)
     return generate_from_def(input_file, ccl_filename, overwrite)
 
 
-def _copy_session_file_to_tmp(session_filename: Path) -> None:
+def _copy_session_file_to_tmp(session_filename: Union[str, bytes, os.PathLike, pathlib.Path]) -> str:
     """copies `session_filename` to user temp directory where
     it is stored under a random filename"""
     random_fpath = random_tmp_filename(".pre")
@@ -231,20 +240,22 @@ def _copy_session_file_to_tmp(session_filename: Path) -> None:
     return random_fpath
 
 
-def generate_from_res_or_cfx(res_cfx_filename: Path, ccl_filename: Path) -> Path:
+def generate_from_res_or_cfx(res_cfx_filename: Union[str, bytes, os.PathLike, pathlib.Path],
+                             ccl_filename: pathlib.Path, cfx5pre:str) -> pathlib.Path:
     # TODO: check: ccl_filename is not used!
     if res_cfx_filename.suffix == '.cfx':
         session_filename = os.path.join(SESSIONS_DIR, 'cfx2ccl.pre')
-
-    if res_cfx_filename.suffix == '.res':
+    elif res_cfx_filename.suffix == '.res':
         session_filename = os.path.join(SESSIONS_DIR, 'res2ccl.pre')
+    else:
+        raise ValueError(f'Could not determine "session_filename"')
 
     random_fpath = _copy_session_file_to_tmp(session_filename)
     _capital_ext = res_cfx_filename.suffix[1:].capitalize()
     _replace_in_file(random_fpath, f'__{_capital_ext}_FILE__', res_cfx_filename)
 
     logger.debug(f'Playing CFX session file: {random_fpath}')
-    _play_session(random_fpath, CFX5PRE)
+    _play_session(random_fpath, cfx5pre)
     os.remove(random_fpath)
     return ccl_filename
 
@@ -266,35 +277,38 @@ def _replace_in_file(filename, keyword, new_string):
         f.write(s)
 
 
-def generate_from_def(def_filename: Path, ccl_filename: Path, overwrite: bool = True) -> Path:
+def generate_from_def(def_filename: Union[str, bytes, os.PathLike, pathlib.Path],
+                      ccl_filename: Union[str, bytes, os.PathLike, pathlib.Path],
+                      overwrite: bool = True) -> pathlib.Path:
     """generates a ccl file from a def file"""
     if ccl_filename.exists() and overwrite:
         ccl_filename.unlink()
-    cmd = f'cfx5cmds -read -def "{def_filename}" -text "{ccl_filename}"'
-    os.system(f'cfx5cmds -read -def "{def_filename}" -text "{ccl_filename}"')
+    cmd = f'{CFX5CMDS} -read -def "{def_filename}" -text "{ccl_filename}"'
+    os.system(cmd)
     if not ccl_filename.exists():
         raise RuntimeError(f'Failed running bash script "{cmd}"')
     return ccl_filename
 
 
-def _play_session(session_file: Path, cfx5pre: Path = None) -> None:
+def _play_session(session_file: Union[str, bytes, os.PathLike, pathlib.Path],
+                  cfx5pre: Union[str, bytes, os.PathLike, pathlib.Path] = None) -> None:
     """
     Runs cfx5pre
 
     Parameters
     ----------
-    cfx5pre : Path, optional
+    cfx5pre : Union[str, bytes, os.PathLike, pathlib.Path], optional
         path to cfx5pre exe.
         Default takes from config file
     """
     if cfx5pre is None:
-        _cfx5path = Path(CFX5PRE)
+        _cfx5path = pathlib.Path(CFX5PRE)
     else:
         _cfx5path = CFX5PRE
 
     if not _cfx5path.exists():
         raise FileExistsError(f'Could not find cfx5pre exe here: {_cfx5path}')
 
-    session_file = Path(session_file)
+    session_file = pathlib.Path(session_file)
 
     os.system(f"{_cfx5path} -batch {session_file}")

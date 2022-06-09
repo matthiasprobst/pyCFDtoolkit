@@ -2,7 +2,7 @@ import pathlib
 
 from ._logger import logger, _file_handler, _stream_handler
 
-USER_CONFIG_DIR = pathlib.Path.home()
+USER_CONFIG_DIR = pathlib.Path.home() / ".config" / __package__
 CFX_DOTENV_FILENAME = USER_CONFIG_DIR.joinpath('cfx.env')
 SESSIONS_DIR = USER_CONFIG_DIR.joinpath('sessions')
 
@@ -13,6 +13,11 @@ def set_loglevel(level):
     _file_handler.setLevel(level.upper())
     _stream_handler.setLevel(level.upper())
 
+
+def _make_user_config_dir():
+    """creates the tmp directory for cfx session files"""
+    if not USER_CONFIG_DIR.exists():
+        USER_CONFIG_DIR.mkdir()
 
 def _make_sessions_dir():
     """creates the tmp directory for cfx session files"""
