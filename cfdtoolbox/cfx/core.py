@@ -224,11 +224,18 @@ class CFXDefFile(CFXFile):
 
     ccl: CCLFile = None
 
-    def write_ccl_file(self, ccl_filename=None, overwrite=False) -> pathlib.Path:
+    def __post_init__(self):
+        super().__post_init__()
+        self.write_ccl_file(overwrite=True)
+
+    def _generate_ccl_filename(self):
+        return self.aux_dir.joinpath(f'{self.stem}.ccl')
+
+    def write_ccl_file(self, ccl_filename=None, overwrite:bool=True) -> pathlib.Path:
         """writes a ccl file from a *.cfx file"""
         if ccl_filename is None:
-            ccl_filename = self.parent.joinpath(f'{self.stem}.ccl')
-        self.ccl = CCLFile(generate_ccl(self.filename, ccl_filename, None, overwrite))
+            ccl_filename = self._generate_ccl_filename()
+        self.ccl = CCLFile(generate_ccl(self.filename, ccl_filename, None, overwrite=overwrite))
         return self.ccl.filename
 
 

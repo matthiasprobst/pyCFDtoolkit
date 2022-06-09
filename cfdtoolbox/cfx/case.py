@@ -1,18 +1,18 @@
 import os
 import pathlib
-import shutil
 import time
+import shutil
 from dataclasses import dataclass
 from typing import Union
 from warnings import warn
 
 import dotenv
+from .core import CFXFile
 
 from . import solve
 from .ccl import CCLFile
 from .ccl import generate as generate_ccl
 from .core import AnalysisType, CFXResFile, CFXResFiles, touch_stp, _predict_new_res_filename, CFXDefFile
-from .core import CFXFile
 from .. import CFX_DOTENV_FILENAME
 
 dotenv.load_dotenv(CFX_DOTENV_FILENAME)
@@ -27,7 +27,6 @@ def update_cfx_case(func):
         return func(*args, **kwargs)
 
     return update_cfx_case_wrapper
-
 
 @dataclass
 class CFXCase(CFXFile):
@@ -95,7 +94,7 @@ class CFXCase(CFXFile):
             return AnalysisType.STEADYSTATE
         return AnalysisType.TRANSIENT
 
-    def write_ccl_file(self, ccl_filename=None, overwrite=False):
+    def write_ccl_file(self, ccl_filename=None, overwrite=True):
         """writes a ccl file from a *.cfx file"""
         if ccl_filename is None:
             ccl_filename = self.aux_dir.joinpath(f'{self.filename.stem}.ccl')
@@ -145,8 +144,7 @@ class CFXCase(CFXFile):
         """scans for cfx files (.cfx and .res and .def, and .ccl)"""
         def_filename_list = list(self.working_dir.glob(f'{self.filename.stem}.def'))
         if len(def_filename_list) > 1:
-            raise ValueError(
-                f'The case has multiple ({len(def_filename_list)}) *.def files. Only one is expected and allowed')
+            raise ValueError(f'The case has multiple ({len(def_filename_list)}) *.def files. Only one is expected and allowed')
         if len(def_filename_list) == 1:
             self.def_file = CFXDefFile(def_filename_list[0])
             if self.def_file.stem != self.filename.stem:
@@ -170,7 +168,7 @@ class CFXCase(CFXFile):
         """Resets the case, so deletes .out and .res files"""
         if not force:
             answer = input('Are you sure? This will delete the following file patterns: '
-                           f'{self.filename.stem}*.out and {self.filename.stem}*.res [y/N]')
+                  f'{self.filename.stem}*.out and {self.filename.stem}*.res [y/N]')
         else:
             answer = 'y'
         if answer == 'y':
@@ -182,6 +180,7 @@ class CFXCase(CFXFile):
             _ = [shutil.rmtree(f) for f in _list_of_files]
             _list_of_files = self.aux_dir.glob(f'{self.filename.stem}*.monitor')
             _ = [f.unlink() for f in _list_of_files]
+
 
 #
 # class SteadyStateCFX(CFXCase):

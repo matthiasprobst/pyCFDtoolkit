@@ -241,8 +241,9 @@ def _copy_session_file_to_tmp(session_filename: Union[str, bytes, os.PathLike, p
 
 
 def generate_from_res_or_cfx(res_cfx_filename: Union[str, bytes, os.PathLike, pathlib.Path],
-                             ccl_filename: pathlib.Path, cfx5pre:str) -> pathlib.Path:
-    # TODO: check: ccl_filename is not used!
+                             ccl_filename: pathlib.Path, cfx5pre:str, overwrite=True) -> pathlib.Path:
+    if overwrite and ccl_filename.exists():
+        ccl_filename.unlink()
     if res_cfx_filename.suffix == '.cfx':
         session_filename = os.path.join(SESSIONS_DIR, 'cfx2ccl.pre')
     elif res_cfx_filename.suffix == '.res':
@@ -283,6 +284,7 @@ def generate_from_def(def_filename: Union[str, bytes, os.PathLike, pathlib.Path]
     """generates a ccl file from a def file"""
     if ccl_filename.exists() and overwrite:
         ccl_filename.unlink()
+    print(ccl_filename.exists())
     cmd = f'{CFX5CMDS} -read -def "{def_filename}" -text "{ccl_filename}"'
     os.system(cmd)
     if not ccl_filename.exists():
