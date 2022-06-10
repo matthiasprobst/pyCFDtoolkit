@@ -17,4 +17,3 @@ def test__scan_for_files():
     assert case.analysis_type == AnalysisType.TRANSIENT
     assert len(case.res_files) == len(list(case.working_dir.glob('*_trn*.res')))
 
-    case.res_files[-1].resume(2)

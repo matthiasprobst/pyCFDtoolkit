@@ -1,0 +1,35 @@
+COMMAND FILE:
+  CFX Pre Version = 20.2
+END
+
+>load filename=__cfxfilename__, mode=cfx, overwrite=yes
+> update
+
+FLOW: Flow Analysis 1
+  &replace   ANALYSIS TYPE:
+    Option = Transient
+    EXTERNAL SOLVER COUPLING:
+      Option = None
+    END # EXTERNAL SOLVER COUPLING:
+    INITIAL TIME:
+      Option = Automatic with Value
+      Time = 0 [s]
+    END # INITIAL TIME:
+    TIME DURATION:
+      Maximum Number of Timesteps = 1000
+      Option = Maximum Number of Timesteps
+    END # TIME DURATION:
+    TIME STEPS:
+      Option = Timesteps
+      Timesteps = __timestep__ [s]
+    END # TIME STEPS:
+  END # ANALYSIS TYPE:
+END # FLOW:Flow Analysis 1
+> update
+
+>writeCaseFile
+
+>writeCaseFile filename=__deffilename__,operation=write def file
+
+> update
+

@@ -4,7 +4,10 @@ from ._logger import logger, _file_handler, _stream_handler
 
 USER_CONFIG_DIR = pathlib.Path.home() / ".config" / __package__
 CFX_DOTENV_FILENAME = USER_CONFIG_DIR.joinpath('cfx.env')
-SESSIONS_DIR = USER_CONFIG_DIR.joinpath('sessions')
+SESSIONS_DIR = pathlib.Path(__file__).parent.joinpath('cfx/session_files')
+
+if not SESSIONS_DIR.exists():
+    raise NotADirectoryError(f'Ansys CFX session folder not found: {SESSIONS_DIR}')
 
 
 def set_loglevel(level):

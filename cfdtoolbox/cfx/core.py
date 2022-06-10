@@ -16,6 +16,7 @@ from .ccl import CCLFile
 from .ccl import generate as generate_ccl
 from .out_utils import extract_out_data, mesh_info_from_file
 from .. import CFX_DOTENV_FILENAME
+from .session import change_timestep_and_write_def
 
 dotenv.load_dotenv(CFX_DOTENV_FILENAME)
 AUXDIRNAME = '.pycfdtoolbox'
@@ -230,10 +231,32 @@ class CFXDefFile(CFXFile):
         super().__post_init__()
         self.write_ccl_file(overwrite=True)
 
+    @property
+    def timestep(self) -> float:
+        """Returns the timestep read from the definition file. Returns -1 for steady state
+        cases"""
+        self.write_ccl_file(overwrite=True)  # update ccl file!
+        flowgrp = self.ccl.root_group.sub_groups['FLOW: Flow Analysis 1']
+        analysis_type_grp = flowgrp.sub_groups['ANALYSIS TYPE']
+        if 'TIME STEPS' in analysis_type_grp.sub_groups.keys():
+            timestep_grp = flowgrp.sub_groups['ANALYSIS TYPE'].sub_groups['TIME STEPS']
+            return float(timestep_grp.get_lines()[1].split('=')[1].strip().split('[')[0].strip())
+        return -1
+
+    @timestep.setter
+    def timestep(self, timestep: float):
+        self.set_timestep(timestep)
+
+    def set_timestep(self, timestep):
+        change_timestep_and_write_def(self.get_cfx_filename(), self.filename, timestep=timestep)
+
+    def get_cfx_filename(self):
+        return self.working_dir.joinpath(f'{self.filename.stem}.cfx')
+
     def _generate_ccl_filename(self):
         return self.aux_dir.joinpath(f'{self.stem}.ccl')
 
-    def write_ccl_file(self, ccl_filename=None, overwrite:bool=True) -> pathlib.Path:
+    def write_ccl_file(self, ccl_filename=None, overwrite: bool = True) -> pathlib.Path:
         """writes a ccl file from a *.cfx file"""
         if ccl_filename is None:
             ccl_filename = self._generate_ccl_filename()

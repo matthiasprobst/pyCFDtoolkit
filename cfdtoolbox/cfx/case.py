@@ -1,34 +1,25 @@
 import os
 import pathlib
-import time
+import shlex
 import shutil
+import time
 from dataclasses import dataclass
 from typing import Union
 from warnings import warn
 
 import dotenv
-from .core import CFXFile
 
 from . import solve
 from .ccl import CCLFile
 from .ccl import generate as generate_ccl
 from .core import AnalysisType, CFXResFile, CFXResFiles, touch_stp, _predict_new_res_filename, CFXDefFile
+from .core import CFXFile
 from .. import CFX_DOTENV_FILENAME
-import shlex
-import subprocess
+from .cmd import call_cmd
 dotenv.load_dotenv(CFX_DOTENV_FILENAME)
 AUXDIRNAME = '.pycfdtoolbox'
 
 CFX5SOLVE = os.environ.get("cfx5solve")
-
-
-def call_cmd(cmd):
-    cmd_split=shlex.split(cmd)
-    process = subprocess.run(cmd_split,
-                         stdout=subprocess.PIPE,
-                         universal_newlines=True)
-    print(process)
-    return process
 
 
 def update_cfx_case(func):
@@ -37,6 +28,7 @@ def update_cfx_case(func):
         return func(*args, **kwargs)
 
     return update_cfx_case_wrapper
+
 
 @dataclass
 class CFXCase(CFXFile):
@@ -73,6 +65,16 @@ class CFXCase(CFXFile):
         if not self.working_dir.exists():
             raise NotADirectoryError('The working directory does not exist. Can only work with existing cases!')
         self._scan_for_files()
+
+    @property
+    def timestep(self):
+        """returns the time step of the registered def file thus calls timestep property of CFXDefFile instance"""
+        return self.def_file.timestep
+
+    @timestep.setter
+    def timestep(self, timestep):
+        """returns the time step of the registered def file thus calls timestep property of CFXDefFile instance"""
+        return self.def_file.set_timestep(timestep)
 
     @property
     def result_files(self):
@@ -154,7 +156,8 @@ class CFXCase(CFXFile):
         """scans for cfx files (.cfx and .res and .def, and .ccl)"""
         def_filename_list = list(self.working_dir.glob(f'{self.filename.stem}.def'))
         if len(def_filename_list) > 1:
-            raise ValueError(f'The case has multiple ({len(def_filename_list)}) *.def files. Only one is expected and allowed')
+            raise ValueError(
+                f'The case has multiple ({len(def_filename_list)}) *.def files. Only one is expected and allowed')
         if len(def_filename_list) == 1:
             self.def_file = CFXDefFile(def_filename_list[0])
             if self.def_file.stem != self.filename.stem:
@@ -178,7 +181,7 @@ class CFXCase(CFXFile):
         """Resets the case, so deletes .out and .res files"""
         if not force:
             answer = input('Are you sure? This will delete the following file patterns: '
-                  f'{self.filename.stem}*.out and {self.filename.stem}*.res [y/N]')
+                           f'{self.filename.stem}*.out and {self.filename.stem}*.res [y/N]')
         else:
             answer = 'y'
         if answer == 'y':
@@ -190,7 +193,6 @@ class CFXCase(CFXFile):
             _ = [shutil.rmtree(f) for f in _list_of_files]
             _list_of_files = self.aux_dir.glob(f'{self.filename.stem}*.monitor')
             _ = [f.unlink() for f in _list_of_files]
-
 
 #
 # class SteadyStateCFX(CFXCase):

@@ -1,0 +1,8 @@
+COMMAND FILE:
+  CFX Pre Version = 20.2
+END
+
+>load filename=__cfxfilename__, mode=cfx, overwrite=yes
+> update
+>writeCaseFile filename=__deffilename__,operation=write def file
+
