@@ -129,9 +129,12 @@ def _str_to_UserPoint(input_str: str, data: ArrayLike) -> Union[MonitorUserPoint
     if len(_split) == 7:
         name = _split[1]
         domain = _split[2]
-        x = float(_split[3].split('= ')[1].strip('"'))
-        y = float(_split[4].split('= ')[1].strip('"'))
-        z = float(_split[5].split('= ')[1].strip('"'))
+        try:
+            x = float(_split[3].split('=')[1].strip('"'))
+            y = float(_split[4].split('=')[1].strip('"'))
+            z = float(_split[5].split('=')[1].strip('"'))
+        except Exception as e:
+            print(f'Error during user point coordinate extraction of {input_str}: {e}')
         variable_name = _split[6]
         return MonitorUserPoint(data=data,
                                 dims=('iteration',),
@@ -144,7 +147,6 @@ class MonitorDataFrame(pd.DataFrame):
 
     def user_points(self):
         user_point_list = [_str_to_UserPoint(n, self[n]) for n in self.columns if n.find('USER POINT') == 0]
-        print(user_point_list[0].name)
         return {up.attrs['name']: up for up in user_point_list}
 
 

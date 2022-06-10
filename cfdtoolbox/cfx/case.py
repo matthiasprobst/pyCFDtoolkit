@@ -14,11 +14,21 @@ from .ccl import CCLFile
 from .ccl import generate as generate_ccl
 from .core import AnalysisType, CFXResFile, CFXResFiles, touch_stp, _predict_new_res_filename, CFXDefFile
 from .. import CFX_DOTENV_FILENAME
-
+import shlex
+import subprocess
 dotenv.load_dotenv(CFX_DOTENV_FILENAME)
 AUXDIRNAME = '.pycfdtoolbox'
 
 CFX5SOLVE = os.environ.get("cfx5solve")
+
+
+def call_cmd(cmd):
+    cmd_split=shlex.split(cmd)
+    process = subprocess.run(cmd_split,
+                         stdout=subprocess.PIPE,
+                         universal_newlines=True)
+    print(process)
+    return process
 
 
 def update_cfx_case(func):
@@ -130,7 +140,7 @@ class CFXCase(CFXFile):
             # if len(self.res_files) == 0:
             cmd = solve.build_cmd(def_filename=self.def_file.filename, nproc=nproc,
                                   ini_filename=None, timeout=timeout, wait=wait)
-            os.system(cmd)
+            call_cmd(cmd)
             return cmd
 
         if isinstance(initial_result_file, CFXResFile):
