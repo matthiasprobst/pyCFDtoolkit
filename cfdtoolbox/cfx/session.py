@@ -10,14 +10,23 @@ import dotenv
 from .. import CFX_DOTENV_FILENAME
 from .. import SESSIONS_DIR
 from .cmd import call_cmd
+from ..typing import PATHLIKE
 dotenv.load_dotenv(CFX_DOTENV_FILENAME)
 
 logger = logging.getLogger('cfdtoolbox')
 
 CFX5PRE = os.environ.get("cfx5pre")
 
-PATHLIKE = Union[str, bytes, os.PathLike, pathlib.Path]
 
+def cfx2def(cfx_filename: PATHLIKE, def_filename: Union[PATHLIKE, None]=None):
+    if def_filename is None:
+        def_filename = cfx_filename.parent.joinpath(f'{cfx_filename.stem}.def')
+
+    _orig_session_filename = SESSIONS_DIR.joinpath('cfx2def.pre')
+    _tmp_session_filename = copy_session_file_to_tmp(_orig_session_filename)
+    replace_in_file(_tmp_session_filename, '__cfxfilename__', str(cfx_filename))
+    replace_in_file(_tmp_session_filename, '__deffilename__', str(def_filename))
+    play_session(_tmp_session_filename)
 
 def change_timestep_and_write_def(cfx_filename: PATHLIKE, def_filename: PATHLIKE, timestep: float):
     """changes timestep in *.cfx fil and writes solver file *.def"""
