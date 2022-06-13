@@ -14,7 +14,7 @@ from . import mon
 from . import solve
 from .ccl import CCLFile
 from .ccl import generate as generate_ccl
-from .out_utils import extract_out_data, mesh_info_from_file
+from .out import extract_out_data, mesh_info_from_file
 from .. import CFX_DOTENV_FILENAME
 from .session import change_timestep_and_write_def, cfx2def
 from .cmd import call_cmd
@@ -55,24 +55,6 @@ def touch_stp(directory):
 class AnalysisType(Enum):
     STEADYSTATE = 1
     TRANSIENT = 2
-
-
-def _generate_mtime_filename(filename, target_dir) -> pathlib.Path:
-    return pathlib.Path(target_dir).joinpath(f'{pathlib.Path(filename).stem}.st_mtime')
-
-
-def write_mtime(filename, target_dir) -> Tuple[pathlib.Path, float]:
-    fname = pathlib.Path(filename)
-    target_filename = _generate_mtime_filename(filename, target_dir)
-    with open(target_filename, 'w') as f:
-        st_mtime = fname.stat().st_mtime
-        f.write(f'{st_mtime}')
-    return target_filename, st_mtime
-
-
-def read_mtime(filename):
-    with open(filename, 'r') as f:
-        return int(f.readlines()[0])
 
 
 @dataclass
@@ -237,7 +219,7 @@ class CFXDefFile(CFXFile):
         """Returns the timestep read from the definition file. Returns -1 for steady state
         cases"""
         self.write_ccl_file(overwrite=True)  # update ccl file!
-        flowgrp = self.ccl.root_group.sub_groups['FLOW: Flow Analysis 1']
+        flowgrp = self.ccl.get_flow_group()
         analysis_type_grp = flowgrp.sub_groups['ANALYSIS TYPE']
         if 'TIME STEPS' in analysis_type_grp.sub_groups.keys():
             timestep_grp = flowgrp.sub_groups['ANALYSIS TYPE'].sub_groups['TIME STEPS']
