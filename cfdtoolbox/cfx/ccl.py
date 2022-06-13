@@ -8,6 +8,7 @@ import h5py
 import numpy as np
 
 from . import session
+from .cmd import call_cmd
 from .. import CFX_DOTENV_FILENAME, SESSIONS_DIR
 
 dotenv.load_dotenv(CFX_DOTENV_FILENAME)
@@ -255,8 +256,9 @@ def generate_from_def(def_filename: Union[str, bytes, os.PathLike, pathlib.Path]
     """generates a ccl file from a def file"""
     if ccl_filename.exists() and overwrite:
         ccl_filename.unlink()
-    cmd = f'{CFX5CMDS} -read -def "{def_filename}" -text "{ccl_filename}"'
-    os.system(cmd)
+    cmd = f'"{CFX5CMDS}" -read -def "{def_filename}" -text "{ccl_filename}"'
+    call_cmd(cmd, wait=True)
+
     if not ccl_filename.exists():
         raise RuntimeError(f'Failed running bash script "{cmd}"')
     return ccl_filename

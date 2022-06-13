@@ -16,7 +16,7 @@ from .ccl import CCLFile
 from .ccl import generate as generate_ccl
 from .out_utils import extract_out_data, mesh_info_from_file
 from .. import CFX_DOTENV_FILENAME
-from .session import change_timestep_and_write_def
+from .session import change_timestep_and_write_def, cfx2def
 from .cmd import call_cmd
 
 dotenv.load_dotenv(CFX_DOTENV_FILENAME)
@@ -93,8 +93,8 @@ class CFXFile:
         return self.filename.parent
 
     def __post_init__(self):
-        self.filename = pathlib.Path(self.filename)
-        self.working_dir = self.filename.parent
+        self.filename = pathlib.Path(self.filename).resolve()
+        self.working_dir = self.filename.parent.resolve()
         # self.aux_dir = self.working_dir.joinpath(AUXDIRNAME)
         if self.filename.suffix == '.res':
             self.aux_dir = self.working_dir.joinpath(f'.{self.filename.stem.rsplit("_", 1)[0]}.cfdtoolbox')
@@ -261,6 +261,9 @@ class CFXDefFile(CFXFile):
         """writes a ccl file from a *.cfx file"""
         if ccl_filename is None:
             ccl_filename = self._generate_ccl_filename()
+        if not self.filename.exists():
+            print('No def file. Generating it from cfx file')
+            cfx2def(self.get_cfx_filename(), self.filename)
         self.ccl = CCLFile(generate_ccl(self.filename, ccl_filename, None, overwrite=overwrite))
         return self.ccl.filename
 
