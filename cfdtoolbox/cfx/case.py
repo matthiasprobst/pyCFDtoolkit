@@ -115,9 +115,15 @@ class CFXCase(CFXFile):
 
     def stop(self, wait: bool = True, timeout: int = 600):
         """touches a stp-file in the working directory"""
-        for d in self.working_dir.glob('*.dir'):
+        list_of_dir_names = list(self.working_dir.glob('*.dir'))
+        for d in list_of_dir_names:
             if self.def_file.stem == d.stem[:-4]:
                 touch_stp(d)
+
+        if len(list_of_dir_names) == 0:
+            print('No *.dir names found.')
+            return
+
         if wait:
             new_filename = _predict_new_res_filename(self.filename)
             print(f'waiting for {new_filename}')
@@ -141,8 +147,8 @@ class CFXCase(CFXFile):
         if initial_result_file is None:
             # if len(self.res_files) == 0:
             cmd = solve.build_cmd(def_filename=self.def_file.filename, nproc=nproc,
-                                  ini_filename=None, timeout=timeout, wait=wait)
-            call_cmd(cmd)
+                                  ini_filename=None, timeout=timeout)
+            call_cmd(cmd, wait=wait)
             return cmd
 
         if isinstance(initial_result_file, CFXResFile):

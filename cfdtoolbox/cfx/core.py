@@ -17,6 +17,7 @@ from .ccl import generate as generate_ccl
 from .out_utils import extract_out_data, mesh_info_from_file
 from .. import CFX_DOTENV_FILENAME
 from .session import change_timestep_and_write_def
+from .cmd import call_cmd
 
 dotenv.load_dotenv(CFX_DOTENV_FILENAME)
 AUXDIRNAME = '.pycfdtoolbox'
@@ -313,8 +314,8 @@ class CFXResFile(CFXFile):
         if self.def_file is None:
             raise ValueError('Definition file is unknown')
         cmd = solve.build_cmd(def_filename=self.def_file.filename, nproc=nproc,
-                              ini_filename=self.filename, timeout=timeout, wait=wait)
-        os.system(cmd)
+                              ini_filename=self.filename, timeout=timeout)
+        p = call_cmd(cmd, wait)
         return cmd
 
     @property

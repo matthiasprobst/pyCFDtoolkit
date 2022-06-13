@@ -9,7 +9,7 @@ dotenv.load_dotenv(CFX_DOTENV_FILENAME)
 CFX5SOLVE = os.environ.get("cfx5solve")
 
 
-def build_cmd(def_filename, nproc, ini_filename, timeout, wait):
+def build_cmd(def_filename, nproc, ini_filename, timeout):
     def_filename = pathlib.Path(def_filename)
     cmd = f"{CFX5SOLVE}  -def {def_filename}"
 
@@ -19,13 +19,10 @@ def build_cmd(def_filename, nproc, ini_filename, timeout, wait):
     cmd += f" -chdir {def_filename.parent}"
 
     if nproc > 1:
-        cmd += f" -par-local -partition {int(nproc)}"
+        cmd += f" -par-local -partition {int(nproc)} -batch"
 
     if timeout is not None:
         if timeout <= 0:
             raise ValueError(f'Invalid value for timeout: {timeout}')
         cmd += f' -maxet "{int(timeout)} [s]"'  # e.g. maxet='10 [min]'
-    if not wait:
-        cmd += ' &'
-
     return cmd
