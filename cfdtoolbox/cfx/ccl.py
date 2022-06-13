@@ -3,7 +3,7 @@ import os
 import pathlib
 import shutil
 from dataclasses import dataclass
-from typing import Union
+from typing import Union, List
 
 import dotenv
 import h5py
@@ -30,7 +30,7 @@ class CCLDataField:
     value: str
 
     def set(self, new_value) -> None:
-        # TODO open file and replace that line
+        """updates the value in the CCL file"""
         if not self.value == new_value:
             self.value = new_value
             bak_filename = shutil.copy(self.filename, f'{self.filename}.bak')
@@ -99,6 +99,8 @@ class CCLGroup:
                 name = linedata[0].strip()
                 value = linedata[1].strip()
                 data[linedata[0].strip()] = CCLDataField(self.filename, self.grp_line + 1 + iline, name, value)
+            else:
+                break  # all options are at top of a group. once there is a line without "=" the next group begins...
         return data
 
     @property
@@ -165,11 +167,50 @@ class CCLGroup:
 
 
 @dataclass
-class DomainGroup:
+class SpecialCCLGroup:
     ccl_group: CCLGroup
+
+    @property
+    def data(self):
+        return self.ccl_group.data
+
+
+@dataclass
+class DomainGroup(SpecialCCLGroup):
+
+    def __post_init__(self):
+        self.group_type = self.ccl_group.group_type
 
     def is_rotating(self):
         return False
+
+
+@dataclass
+class CCLBoundary(SpecialCCLGroup):
+    pass
+
+
+@dataclass
+class CCLInletBoundary(CCLBoundary):
+
+    def set_normal_speed(self, flow_regime='subsonic', normal_speed=0.2, units='m s^-1', turbulence='medium'):
+        """turbulence must be ignored if laminar!"""
+        _flow_regime = f'{flow_regime[0].capitalize()}{flow_regime[1:]}'
+        f"""
+      BOUNDARY CONDITIONS:
+        FLOW REGIME:
+          Option = {_flow_regime}
+        END
+        MASS AND MOMENTUM:
+          Normal Speed = {normal_speed} [{units}]
+          Option = Normal Speed
+        END
+      END
+        """
+        raise NotImplementedError()
+
+    def set_mass_flow_rate(self):
+        raise NotImplementedError()
 
 
 def cclupdate(func):
@@ -275,8 +316,22 @@ class CCLFile:
         return indentation
 
     @cclupdate
-    def get_boundaries(self):
+    def get_boundaries(self) -> List[CCLBoundary]:
         """returns all CCLGroups defining a boundary"""
+        found = []
+        domain_grps = self.get_domain_groups()
+        for grp in domain_grps:
+            for sgrp in grp.ccl_group.sub_groups.values():
+                if sgrp.group_type == 'BOUNDARY':
+                    found.append(CCLBoundary(sgrp))
+        return found
+
+    def boundary_condition(self, name):
+        boundary_groups = self.get_boundaries()
+        for bdry_grp in boundary_groups:
+            _grpname = bdry_grp.ccl_group.name.lower().split(':')[1].strip()
+            if _grpname == name.lower():
+                return CCLInletBoundary(bdry_grp)
         return None
 
 
