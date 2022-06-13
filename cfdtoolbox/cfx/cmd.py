@@ -1,7 +1,8 @@
-
-import subprocess
-import shlex
 import os
+import shlex
+import subprocess
+
+
 def call_cmd(cmd, wait=True):
     cmd_split = shlex.split(cmd)
     if wait:
