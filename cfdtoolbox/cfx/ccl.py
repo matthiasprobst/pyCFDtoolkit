@@ -8,6 +8,8 @@ from typing import Union
 import dotenv
 import h5py
 import numpy as np
+from IPython.display import display, HTML
+from h5wrapperpy._html.html_repr import h5file_html_repr
 
 from . import session
 from .cmd import call_cmd
@@ -321,7 +323,6 @@ class CCLHDFAttributWrapper:
         with h5py.File(self.filename, 'r+') as h5:
             h5[self.path].attrs[key] = value
 
-
     def __getitem__(self, item):
         return self.values[item]
 
@@ -340,8 +341,18 @@ class CCLHDFGroup:
             attr_dict = dict(h5[self.path].attrs.items())
         return CCLHDFAttributWrapper(self.filename, self.path, attr_dict)
 
+    def __repr__(self):
+        return self.path
+
     def __str__(self):
         print('line repr of group content --> see h5wrappery')
+
+    def dump(self):
+        with h5py.File(self.filename) as h5:
+            display(HTML((h5file_html_repr(h5[self.path], 50))))
+
+    def _repr_html_(self):
+        return self.dump()
 
     def __getitem__(self, item):
         with h5py.File(self.filename) as h5:
@@ -451,12 +462,17 @@ class CCLHDFFile:
         return CCLHDFGroup(item, self.filename)
 
     def __repr__(self):
-        with h5py.File(self.filename) as h5:
-            keys = list(h5.keys())
-        return ''.join(keys)
+        return self.filename
 
     def __str__(self):
         return self.__repr__()
+
+    def dump(self):
+        with h5py.File(self.filename) as h5:
+            display(HTML((h5file_html_repr(h5['/'], 50))))
+
+    def _repr_html_(self):
+        return self.dump()
 
     @property
     def flow(self):
