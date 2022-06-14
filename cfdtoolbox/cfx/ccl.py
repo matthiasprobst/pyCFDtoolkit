@@ -239,55 +239,41 @@ def cclupdate(func):
 
 
 def hdf_to_ccl(hdf_filename: PATHLIKE, ccl_filename: Union[PATHLIKE, None] = None,
-               intendation_step: int = 2) -> PATHLIKE:
+               intendation_step: int = 2) -> pathlib.Path:
+    """converts a HDF file with CCL content into a CCL text file"""
     hdf_filename = pathlib.Path(hdf_filename)
     if ccl_filename is None:
         ccl_filename = hdf_filename.parent.joinpath(f'{hdf_filename.stem}.ccl')
     else:
         ccl_filename = pathlib.Path(ccl_filename)
 
-    class H5Writer():
-        def __init__(self, writer):
-            self.writer = writer
-        def __call__(self, name, h5obj):
-            ret_string = ''
-            if isinstance(h5obj, h5py.Group):
-                nlevel = len(h5obj.name.split('/'))-2
-                _spaces = ''.join([' '] * nlevel)
-                ret_string += _spaces + h5obj.name[1:] + '\n'
-                for k, v in h5obj.attrs.items():
-                    ret_string += _spaces + f' {k} = {v}\n'
-                self.writer.write(ret_string)
-
     def _write_to_file(writer, h5obj):
         ret_string = ''
         nlevel = len(h5obj.name.split('/')) - 2
-        _spaces = ''.join([' '] * nlevel)
+        _spaces = ''.join([' '] * nlevel * intendation_step)
         name_stem = pathlib.Path(h5obj.name).stem
         if ':' in name_stem:
             ret_string += _spaces + name_stem + '\n'
         else:
             ret_string += _spaces + name_stem + ':\n'
 
-        for k, v in h5obj.attrs.items():
-            ret_string += _spaces + f' {k} = {v}\n'
+        for _k, _v in h5obj.attrs.items():
+            ret_string += _spaces.join([' '] * intendation_step) + f' {_k} = {_v}\n'
 
         writer.write(ret_string)
 
-        for k, v in h5obj.items():
-            _write_to_file(writer, v)
+        for _v in h5obj.values():
+            _write_to_file(writer, _v)
 
         ret_string = _spaces + 'END\n'
         writer.write(ret_string)
 
     with open(ccl_filename, 'w') as f:
-        h5w = H5Writer(f)
-        level = 0
         with h5py.File(hdf_filename) as h5:
-            # _write_to_file(f, h5['/'])
             for k, v in h5.items():
                 _write_to_file(f, v)
-            # print(h5.visititems(h5w))
+
+    return ccl_filename
 
 
 class CCLFile:
