@@ -310,20 +310,41 @@ def _list_of_instances_by_keyword_substring(filename, root_group, substring, cla
 
 
 @dataclass
+class CCLHDFAttributWrapper:
+    filename: PATHLIKE
+    path: PATHLIKE
+    values: dict
+
+    def __setitem__(self, key, value):
+        if key in self.values:
+            with h5py.File(self.filename, 'r+') as h5:
+                h5[self.path].attrs[key] = value
+
+    def __getitem__(self, item):
+        return self.values[item]
+
+
+@dataclass
 class CCLHDFGroup:
     path: str
     filename: PATHLIKE
 
     @property
-    def attrs(self):
-        pass
+    def option(self):
+        with h5py.File(self.filename) as h5:
+            attr_dict = dict(h5[self.path].attrs.items())
+        return CCLHDFAttributWrapper(self.filename, self.path, attr_dict)
 
     @property
     def __str__(self):
         print('line repr of group content --> see h5wrappery')
 
     def __getitem__(self, item):
-        print(f'Requesting boundary {pathlib.Path(self.path).joinpath(item)}')
+        with h5py.File(self.filename) as h5:
+            if item in h5[self.path]:
+                return CCLHDFGroup(f'{self.path}/{item}', self.filename)
+            else:
+                raise KeyError(f'{item} not found in {self.path}')
 
     def parent(self):
         if self.path == '/':
@@ -395,6 +416,13 @@ class CCLHDFFlowGroup(CCLHDFGroup):
     def domains(self):
         """returns domain groups"""
         return _list_of_instances_by_keyword_substring(self.filename, self.path, 'DOMAIN: ', CCLHDFDomainGroup)
+
+    # @property
+    # def solver_control(self):
+    #     return CCLHDFSolverControlGroup(self.path, self.filename)
+    # @property
+    # def output_control(self):
+    #     return CCLHDFOutputControlGroup(self.path, self.filename)
 
 
 class CCLHDFFile:
