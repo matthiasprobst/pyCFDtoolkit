@@ -12,7 +12,7 @@ from numpy.typing import ArrayLike
 
 from . import mon
 from . import solve
-from .ccl import CCLFile
+from .ccl import CCLTextFile, CCLHDFFile
 from .ccl import generate as generate_ccl
 from .out import extract_out_data, mesh_info_from_file
 from .. import CFX_DOTENV_FILENAME
@@ -208,7 +208,7 @@ class OutFile(MonitorData):
 class CFXDefFile(CFXFile):
     """Class wrapped around the *.def case file"""
 
-    ccl: CCLFile = None
+    ccl: CCLHDFFile = None
 
     def __post_init__(self):
         super().__post_init__()
@@ -246,7 +246,11 @@ class CFXDefFile(CFXFile):
         if not self.filename.exists():
             print('No def file. Generating it from cfx file')
             cfx2def(self.get_cfx_filename(), self.filename)
-        self.ccl = CCLFile(generate_ccl(self.filename, ccl_filename, None, overwrite=overwrite))
+
+        ccl_filename = generate_ccl(self.filename, ccl_filename, None, overwrite=overwrite)
+        ccltext = CCLTextFile(ccl_filename)
+        ccl_hdf_filename = ccltext.to_hdf()
+        self.ccl = CCLHDFFile(ccl_hdf_filename)
         return self.ccl.filename
 
 

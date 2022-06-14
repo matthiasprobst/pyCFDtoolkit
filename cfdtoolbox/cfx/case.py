@@ -10,7 +10,7 @@ from warnings import warn
 import dotenv
 
 from . import solve
-from .ccl import CCLFile
+from .ccl import CCLTextFile, CCLHDFGroup
 from .ccl import generate as generate_ccl
 from .core import AnalysisType, CFXResFile, CFXResFiles, touch_stp, _predict_new_res_filename, CFXDefFile
 from .core import CFXFile
@@ -106,12 +106,12 @@ class CFXCase(CFXFile):
             return AnalysisType.STEADYSTATE
         return AnalysisType.TRANSIENT
 
-    def write_ccl_file(self, ccl_filename=None, overwrite=True):
-        """writes a ccl file from a *.cfx file"""
-        if ccl_filename is None:
-            ccl_filename = self.aux_dir.joinpath(f'{self.filename.stem}.ccl')
-        return CCLFile(generate_ccl(input_file=self.def_file.filename, ccl_filename=ccl_filename,
-                                    cfx5pre=None, overwrite=overwrite))
+    # def write_ccl_file(self, ccl_filename=None, overwrite=True):
+    #     """writes a ccl file from a *.cfx file"""
+    #     if ccl_filename is None:
+    #         ccl_filename = self.aux_dir.joinpath(f'{self.filename.stem}.ccl')
+    #     return CCLFile(generate_ccl(input_file=self.def_file.filename, ccl_filename=ccl_filename,
+    #                                 cfx5pre=None, overwrite=overwrite))
 
     def stop(self, wait: bool = True, timeout: int = 600):
         """touches a stp-file in the working directory"""

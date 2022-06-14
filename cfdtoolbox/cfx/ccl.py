@@ -3,15 +3,15 @@ import os
 import pathlib
 import shutil
 from dataclasses import dataclass
-from typing import Union, List
+from typing import Union
 
 import dotenv
 import h5py
 import numpy as np
 
 from . import session
-from .boundary_conditions.inlet import InletBoundaryCondition
 from .cmd import call_cmd
+from .utils import change_suffix
 from .. import CFX_DOTENV_FILENAME, SESSIONS_DIR
 from ..typing import PATHLIKE
 
@@ -167,75 +167,16 @@ class CCLGroup:
             subg.create_h5_group(g, overwrite=overwrite)
 
 
-class SpecialCCLGroup(CCLGroup):
-
-    def __init__(self, *args, **kwargs):
-        if isinstance(args[0], CCLGroup):
-            self.filename = args[0].filename
-            self.all_lines = args[0].all_lines
-            self.all_indentation = args[0].all_indentation
-
-            self.grp_line = args[0].grp_line
-            self.end_line = args[0].end_line
-
-            self.name = args[0].name
-            self.group_type = args[0].group_type
-
-            self.indentation_length = args[0].indentation_length
-            self.intendation_step = args[0].intendation_step
-            self.verbose = args[0].verbose
-            self.sub_groups = args[0].sub_groups
-
-        else:
-            super(SpecialCCLGroup, self).__init__(*args, **kwargs)
-
-
-class DomainGroup(SpecialCCLGroup):
-
-    def is_rotating(self):
-        return False
-
-
-class CCLBoundary(SpecialCCLGroup):
-    pass
-
-
-@dataclass
-class CCLInletBoundary(CCLBoundary):
-
-    def set(self, boundary: InletBoundaryCondition):
-        pass
-
-    def set_normal_speed(self, flow_regime='subsonic', normal_speed=0.2, units='m s^-1', turbulence='medium'):
-        """turbulence must be ignored if laminar!"""
-        _flow_regime = f'{flow_regime[0].capitalize()}{flow_regime[1:]}'
-        f"""
-      BOUNDARY CONDITIONS:
-        FLOW REGIME:
-          Option = {_flow_regime}
-        END
-        MASS AND MOMENTUM:
-          Normal Speed = {normal_speed} [{units}]
-          Option = Normal Speed
-        END
-      END
-        """
-        raise NotImplementedError()
-
-    def set_mass_flow_rate(self):
-        raise NotImplementedError()
-
-
-def cclupdate(func):
-    def cclupdate_wrapper(*args, **kwargs):
-        current_mtime = pathlib.Path(args[0].filename).stat().st_mtime
-        if current_mtime > args[0].mtime:
-            _new_args = list(args)
-            _new_args[0] = CCLFile(args[0].filename, args[0].intendation_step)
-            return func(*tuple(_new_args), **kwargs)
-        return func(*args, **kwargs)
-
-    return cclupdate_wrapper
+# def cclupdate(func):
+#     def cclupdate_wrapper(*args, **kwargs):
+#         current_mtime = pathlib.Path(args[0].filename).stat().st_mtime
+#         if current_mtime > args[0].mtime:
+#             _new_args = list(args)
+#             _new_args[0] = CCLTextFile(args[0].filename, args[0].intendation_step)
+#             return func(*tuple(_new_args), **kwargs)
+#         return func(*args, **kwargs)
+#
+#     return cclupdate_wrapper
 
 
 def hdf_to_ccl(hdf_filename: PATHLIKE, ccl_filename: Union[PATHLIKE, None] = None,
@@ -276,54 +217,46 @@ def hdf_to_ccl(hdf_filename: PATHLIKE, ccl_filename: Union[PATHLIKE, None] = Non
     return ccl_filename
 
 
-class CCLFile:
+INTENDATION_STEP = 2
+
+
+class CCLTextFile:
     """
-    Reads in a ANSYS CFX *.ccl file
-    and can write it to *.hdf
+    Reads in a ANSYS CFX *.ccl file (plain text)
 
     Example
-    ------
+    -------
     c = CCL_File(ccl_filename)
     c.write_to_hdf('ccltest.hdf', overwrite=True)
-
-    or
-    hdf_filepath = CCL_File(ccl_filename).write_to_hdf('ccltest.hdf', overwrite=True)
     """
 
-    def __init__(self, filename: PATHLIKE, intendation_step: int = 2, verbose=False):
+    def __init__(self, filename: PATHLIKE, verbose: bool = False):
         self.filename = pathlib.Path(filename)
         self.lines = self._remove_linebreaks()
         self.indentation = self._get_indentation()
-        self.intendation_step = intendation_step
+        self.intendation_step = INTENDATION_STEP
         self.root_group = CCLGroup(self.filename, 0, -1, indentation_length=self.indentation[0][1],
-                                   intendation_step=intendation_step,
+                                   intendation_step=self.intendation_step,
                                    all_lines=self.lines,
                                    all_indentation=self.indentation, name='root', verbose=verbose)
         self.mtime = self.filename.stat().st_mtime
 
-    @cclupdate
-    def get_domain_groups(self):
-        flow_group = self.get_flow_group()
-        _found = []
-        for grp in flow_group.sub_groups.values():
-            if grp.group_type == 'DOMAIN':
-                _found.append(DomainGroup(grp))
-        return _found
-
-    @cclupdate
     def get_flow_group(self):
         for grp in self.root_group.sub_groups.values():
             if grp.group_type == 'FLOW':
                 return grp
 
-    @cclupdate
-    def to_hdf(self, hdf_filename: PATHLIKE, overwrite=True):
-        if os.path.isfile(hdf_filename):
-            mode = 'r+'
+    def to_hdf(self, hdf_filename: Union[PATHLIKE, None], overwrite=True):
+        if hdf_filename is None:
+            hdf_filename = change_suffix(self.filename, '.hdf')
         else:
-            mode = 'w'
-        with h5py.File(hdf_filename, mode) as h5:
-            self.root_group.create_h5_group(h5['/'], root_group=True, overwrite=overwrite)
+            hdf_filename = pathlib.Path(hdf_filename)
+
+        if hdf_filename.is_file() and not overwrite:
+            raise FileExistsError(f'Target HDF file exists and overwrite is set to False!')
+
+        with h5py.File(hdf_filename, 'w') as h5:
+            self.root_group.create_h5_group(h5['/'], root_group=True, overwrite=True)
 
         return hdf_filename
 
@@ -361,33 +294,141 @@ class CCLFile:
             l0 = len(line)
             l1 = len(line.strip(' '))
             indentation.append((i, l0 - l1))
-        # indentation_n = np.asarray([i[1] for i in indentation])
-        # indentation_n
-        # unique_indentation = np.unique(indentation_n)
         return indentation
 
-    @cclupdate
-    def get_boundaries(self) -> List[CCLBoundary]:
-        """returns all CCLGroups defining a boundary"""
-        found = []
-        domain_grps = self.get_domain_groups()
-        for grp in domain_grps:
-            for sgrp in grp.sub_groups.values():
-                if sgrp.group_type == 'BOUNDARY':
-                    found.append(CCLBoundary(sgrp))
-        return found
 
-    def boundary_condition(self, name):
-        boundary_groups = self.get_boundaries()
-        for bdry_grp in boundary_groups:
-            _grpname = bdry_grp.name.lower().split(':')[1].strip()
-            if _grpname == name.lower():
-                return CCLInletBoundary(bdry_grp)
-        return None
+def _list_of_instances_by_keyword_substring(filename, root_group, substring, class_):
+    instances = []
+    with h5py.File(filename) as h5:
+        for k in h5[root_group].keys():
+            if substring in k:
+                if root_group == '/':
+                    instances.append(class_(k, filename))
+                else:
+                    instances.append(class_(f'{root_group}/{k}', filename))
+    return instances
+
+
+@dataclass
+class CCLHDFGroup:
+    path: str
+    filename: PATHLIKE
+
+    @property
+    def attrs(self):
+        pass
+
+    @property
+    def __str__(self):
+        print('line repr of group content --> see h5wrappery')
+
+    def __getitem__(self, item):
+        print(f'Requesting boundary {pathlib.Path(self.path).joinpath(item)}')
+
+    def parent(self):
+        if self.path == '/':
+            return CCLHDFGroup('/', self.filename)
+        else:
+            parent_path = self.path.rsplit('/', 1)[0]
+            return CCLHDFGroup(parent_path, self.filename)
+
+    def get_parent_path(self):
+        if self.path == '/':
+            return '/'
+        return self.path.rsplit('/', 1)[0]
+
+    def rename(self, new_name: str):
+        """renames hdf group. call h5py.move()"""
+        if self.path == '/':
+            raise KeyError(f'Cannot rename roote group!')
+        with h5py.File(self.filename, 'r+') as h5:
+            parent_path = self.get_parent_path()
+            if new_name[0] == '/':
+                new_name = new_name[1:]
+            _new_path = f'{parent_path}/{new_name}'
+            h5.move(self.path, _new_path)
+            return self.__class__(_new_path, self.filename)
+
+
+@dataclass
+class CCLHDFBoundaryCondition(CCLHDFGroup):
+    pass
+
+
+@dataclass
+class CCLHDFBoundary(CCLHDFGroup):
+
+    @property
+    def condition(self):
+        """Returns the boundary condition group of the boundary"""
+        return _list_of_instances_by_keyword_substring(self.filename, self.path, 'BOUNDARY CONDITIONS',
+                                                       CCLHDFBoundaryCondition)[0]
+
+    @condition.setter
+    def condition(self, bdry):
+        """Writes a new boundary condition to the HDF file"""
+        raise NotImplementedError()
+
+
+@dataclass
+class CCLHDFDomainGroup(CCLHDFGroup):
+
+    @property
+    def boundaries(self):
+        """returns domain groups"""
+        return _list_of_instances_by_keyword_substring(self.filename, self.path, 'BOUNDARY: ', CCLHDFBoundary)
+
+    def parent(self):
+        if self.path == '/':
+            return CCLHDFGroup('/', self.filename)
+        else:
+            parent_path = self.get_parent_path()
+            if 'DOMAIN: ' in parent_path:
+                return CCLHDFDomainGroup(parent_path, self.filename)
+            return CCLHDFGroup(parent_path, self.filename)
+
+
+@dataclass
+class CCLHDFFlowGroup(CCLHDFGroup):
+
+    @property
+    def domains(self):
+        """returns domain groups"""
+        return _list_of_instances_by_keyword_substring(self.filename, self.path, 'DOMAIN: ', CCLHDFDomainGroup)
+
+
+class CCLHDFFile:
+    """Interface class to the HDF file containing CCL data"""
+
+    def __init__(self, filename):
+        self.filename = filename
+
+    def __getitem__(self, item):
+        with h5py.File(self.filename) as h5:
+            if item not in h5:
+                return KeyError(f'Key not found in {h5.name}')
+        return CCLHDFGroup(item, self.filename)
+
+    def __repr__(self):
+        with h5py.File(self.filename) as h5:
+            keys = list(h5.keys())
+        return keys
+
+    def __str__(self):
+        return self.__repr__()
+
+    @property
+    def flow(self):
+        return _list_of_instances_by_keyword_substring(self.filename, '/', 'FLOW: ', CCLHDFFlowGroup)
+
+    def to_ccl(self, ccl_filename: Union[PATHLIKE, None]):
+        if ccl_filename is None:
+            ccl_filename = change_suffix(self.filename)
+        hdf_to_ccl(self.filename, ccl_filename, intendation_step=INTENDATION_STEP)
 
 
 def generate(input_file: Union[str, bytes, os.PathLike, pathlib.Path], ccl_filename: pathlib.Path = None,
-             cfx5pre: pathlib.Path = None, overwrite: bool = True):
+             cfx5pre: pathlib.Path = None, overwrite: bool = True) -> pathlib.Path:
     """
     Converts a cfx or def file into a ccl file.
     If no `ccl_filename` is provided the input filename is
@@ -416,7 +457,7 @@ def generate(input_file: Union[str, bytes, os.PathLike, pathlib.Path], ccl_filen
         raise ValueError('Please provide a ANSYS CFX file.')
 
     if ccl_filename is None:
-        ccl_filename = pathlib.Path.joinpath(input_file.parent, f'{input_file.stem}.ccl')
+        ccl_filename = change_suffix(input_file, '.ccl')
     logger.debug(f'*.ccl input_file: {ccl_filename}')
 
     if input_file in ('cfx', '.res'):

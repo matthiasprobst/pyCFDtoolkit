@@ -15,3 +15,11 @@ def write_mtime(filename, target_dir) -> Tuple[PATHLIKE, float]:
         st_mtime = fname.stat().st_mtime
         f.write(f'{st_mtime}')
     return target_filename, st_mtime
+
+
+def change_suffix(filename: PATHLIKE, new_suffix: str) -> pathlib.Path:
+    """Reads a filename (must not exist) and exchanges the suffix with the new given one"""
+    filename = pathlib.Path(filename)
+    if new_suffix[0] != '.':
+        new_suffix = '.' + new_suffix
+    return filename.parent.joinpath(f'{filename.stem}{new_suffix}')
