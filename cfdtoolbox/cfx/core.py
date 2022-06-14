@@ -3,7 +3,7 @@ import pathlib
 import time
 from dataclasses import dataclass
 from enum import Enum
-from typing import Union, Tuple, List
+from typing import Union, List
 
 import dotenv
 import pandas as pd
@@ -14,10 +14,9 @@ from . import mon
 from . import solve
 from .ccl import CCLTextFile, CCLHDFFile
 from .ccl import generate as generate_ccl
+from .cmd import call_cmd
 from .out import extract_out_data, mesh_info_from_file
 from .. import CFX_DOTENV_FILENAME
-from .session import change_timestep_and_write_def, cfx2def
-from .cmd import call_cmd
 
 dotenv.load_dotenv(CFX_DOTENV_FILENAME)
 AUXDIRNAME = '.pycfdtoolbox'
@@ -214,25 +213,6 @@ class CFXDefFile(CFXFile):
         super().__post_init__()
         self.write_ccl_file(overwrite=True)
 
-    @property
-    def timestep(self) -> float:
-        """Returns the timestep read from the definition file. Returns -1 for steady state
-        cases"""
-        self.write_ccl_file(overwrite=True)  # update ccl file!
-        flowgrp = self.ccl.get_flow_group()
-        analysis_type_grp = flowgrp.sub_groups['ANALYSIS TYPE']
-        if 'TIME STEPS' in analysis_type_grp.sub_groups.keys():
-            timestep_grp = flowgrp.sub_groups['ANALYSIS TYPE'].sub_groups['TIME STEPS']
-            return float(timestep_grp.get_lines()[1].split('=')[1].strip().split('[')[0].strip())
-        return -1
-
-    @timestep.setter
-    def timestep(self, timestep: float):
-        self.set_timestep(timestep)
-
-    def set_timestep(self, timestep):
-        change_timestep_and_write_def(self.get_cfx_filename(), self.filename, timestep=timestep)
-
     def get_cfx_filename(self):
         return self.working_dir.joinpath(f'{self.filename.stem}.cfx')
 
@@ -240,14 +220,16 @@ class CFXDefFile(CFXFile):
         return self.aux_dir.joinpath(f'{self.stem}.ccl')
 
     def write_ccl_file(self, ccl_filename=None, overwrite: bool = True) -> pathlib.Path:
-        """writes a ccl file from a *.cfx file"""
+        """writes a ccl file from a *.def file"""
         if ccl_filename is None:
             ccl_filename = self._generate_ccl_filename()
         if not self.filename.exists():
-            print('No def file. Generating it from cfx file')
-            cfx2def(self.get_cfx_filename(), self.filename)
+            # generate the ccl file from the cfx file:
+            ccl_filename = generate_ccl(self.get_cfx_filename(), ccl_filename, None, overwrite=overwrite)
+        else:
+            # generate the ccl file from the def file:
+            ccl_filename = generate_ccl(self.filename, ccl_filename, None, overwrite=overwrite)
 
-        ccl_filename = generate_ccl(self.filename, ccl_filename, None, overwrite=overwrite)
         ccltext = CCLTextFile(ccl_filename)
         ccl_hdf_filename = ccltext.to_hdf()
         self.ccl = CCLHDFFile(ccl_hdf_filename)

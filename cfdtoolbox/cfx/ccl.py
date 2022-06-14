@@ -11,6 +11,7 @@ import numpy as np
 
 from . import session
 from .cmd import call_cmd
+from .session import cfx2def
 from .utils import change_suffix
 from .. import CFX_DOTENV_FILENAME, SESSIONS_DIR
 from ..typing import PATHLIKE
@@ -316,12 +317,16 @@ class CCLHDFAttributWrapper:
     values: dict
 
     def __setitem__(self, key, value):
-        if key in self.values:
-            with h5py.File(self.filename, 'r+') as h5:
-                h5[self.path].attrs[key] = value
+        _ = self.values[key]  # let python raise the error if key not in self.values
+        with h5py.File(self.filename, 'r+') as h5:
+            h5[self.path].attrs[key] = value
+
 
     def __getitem__(self, item):
         return self.values[item]
+
+    def __repr__(self):
+        return str(self.values)
 
 
 @dataclass
@@ -330,12 +335,11 @@ class CCLHDFGroup:
     filename: PATHLIKE
 
     @property
-    def option(self):
+    def options(self):
         with h5py.File(self.filename) as h5:
             attr_dict = dict(h5[self.path].attrs.items())
         return CCLHDFAttributWrapper(self.filename, self.path, attr_dict)
 
-    @property
     def __str__(self):
         print('line repr of group content --> see h5wrappery')
 
@@ -346,6 +350,7 @@ class CCLHDFGroup:
             else:
                 raise KeyError(f'{item} not found in {self.path}')
 
+    @property
     def parent(self):
         if self.path == '/':
             return CCLHDFGroup('/', self.filename)
@@ -428,8 +433,16 @@ class CCLHDFFlowGroup(CCLHDFGroup):
 class CCLHDFFile:
     """Interface class to the HDF file containing CCL data"""
 
-    def __init__(self, filename):
-        self.filename = filename
+    def __init__(self, filename: PATHLIKE):
+        filename = pathlib.Path(filename)
+        if filename.suffix == '.hdf':
+            self.filename = filename
+        elif filename.suffix == '.ccl':
+            ccltext = CCLTextFile(filename)
+            self.filename = ccltext.to_hdf(change_suffix(filename, '.hdf'))
+        else:
+            ccltext = CCLTextFile(generate(filename))
+            self.filename = ccltext.to_hdf(change_suffix(filename, '.hdf'))
 
     def __getitem__(self, item):
         with h5py.File(self.filename) as h5:
@@ -440,7 +453,7 @@ class CCLHDFFile:
     def __repr__(self):
         with h5py.File(self.filename) as h5:
             keys = list(h5.keys())
-        return keys
+        return ''.join(keys)
 
     def __str__(self):
         return self.__repr__()
@@ -455,18 +468,18 @@ class CCLHDFFile:
         hdf_to_ccl(self.filename, ccl_filename, intendation_step=INTENDATION_STEP)
 
 
-def generate(input_file: Union[str, bytes, os.PathLike, pathlib.Path], ccl_filename: pathlib.Path = None,
+def generate(input_file: PATHLIKE, ccl_filename: Union[PATHLIKE, None] = None,
              cfx5pre: pathlib.Path = None, overwrite: bool = True) -> pathlib.Path:
     """
-    Converts a cfx or def file into a ccl file.
+    Converts a .res, .cfx or .def file into a ccl file.
     If no `ccl_filename` is provided the input filename is
     taken and extension is changed accordingly to *.ccl
 
     Parameters
     ----------
-    input_file : `Path`
+    input_file : PATHLIKE
         *.res or *.cfx file
-    ccl_filename: `Path`
+    ccl_filename: PATHLIKE or None
         Where to write ccl file. Default changes extension of input to "ccl"
     cfx5pre: `Path`
         Path to exe. Default takes path from config
@@ -478,8 +491,7 @@ def generate(input_file: Union[str, bytes, os.PathLike, pathlib.Path], ccl_filen
     ccl_filename : `Path`
         Path to generated ccl file
     """
-    if not isinstance(input_file, pathlib.Path):
-        input_file = pathlib.Path(input_file)
+    input_file = pathlib.Path(input_file).resolve()
 
     if input_file.suffix not in ('.cfx', '.res', '.def'):
         raise ValueError('Please provide a ANSYS CFX file.')
@@ -488,16 +500,19 @@ def generate(input_file: Union[str, bytes, os.PathLike, pathlib.Path], ccl_filen
         ccl_filename = change_suffix(input_file, '.ccl')
     logger.debug(f'*.ccl input_file: {ccl_filename}')
 
-    if input_file in ('cfx', '.res'):
+    if input_file.suffix in ('.cfx', '.res'):
+        # build def file and then call _generate_from_def
+        # this is the safe way!
         if cfx5pre is None:
             cfx5pre = CFX5PRE
-        return generate_from_res_or_cfx(input_file, ccl_filename,
-                                        cfx5pre=cfx5pre)
-    return generate_from_def(input_file, ccl_filename, overwrite)
+
+        def_filename = cfx2def(input_file)
+        return _generate_from_def(def_filename, ccl_filename, overwrite)
+    return _generate_from_def(input_file, ccl_filename, overwrite)
 
 
-def generate_from_res_or_cfx(res_cfx_filename: Union[str, bytes, os.PathLike, pathlib.Path],
-                             ccl_filename: pathlib.Path, cfx5pre: str, overwrite=True) -> pathlib.Path:
+def _generate_from_res_or_cfx(res_cfx_filename: PATHLIKE,
+                              ccl_filename: pathlib.Path, cfx5pre: str, overwrite=True) -> pathlib.Path:
     if overwrite and ccl_filename.exists():
         ccl_filename.unlink()
     if res_cfx_filename.suffix == '.cfx':
@@ -508,8 +523,9 @@ def generate_from_res_or_cfx(res_cfx_filename: Union[str, bytes, os.PathLike, pa
         raise ValueError(f'Could not determine "session_filename"')
 
     random_fpath = session.copy_session_file_to_tmp(session_filename)
-    _capital_ext = res_cfx_filename.suffix[1:].capitalize()
-    session.replace_in_file(random_fpath, f'__{_capital_ext}_FILE__', res_cfx_filename)
+    _upper_ext = res_cfx_filename.suffix[1:].upper()
+    session.replace_in_file(random_fpath, f'__{_upper_ext}_FILE__', res_cfx_filename)
+    session.replace_in_file(random_fpath, '__CCL_FILE__', ccl_filename)
 
     logger.debug(f'Playing CFX session file: {random_fpath}')
     session.play_session(random_fpath, cfx5pre)
@@ -517,9 +533,9 @@ def generate_from_res_or_cfx(res_cfx_filename: Union[str, bytes, os.PathLike, pa
     return ccl_filename
 
 
-def generate_from_def(def_filename: Union[str, bytes, os.PathLike, pathlib.Path],
-                      ccl_filename: Union[str, bytes, os.PathLike, pathlib.Path],
-                      overwrite: bool = True) -> pathlib.Path:
+def _generate_from_def(def_filename: PATHLIKE,
+                       ccl_filename: PATHLIKE,
+                       overwrite: bool = True) -> pathlib.Path:
     """generates a ccl file from a def file"""
     if ccl_filename.exists() and overwrite:
         ccl_filename.unlink()

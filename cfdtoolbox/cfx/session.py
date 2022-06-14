@@ -7,18 +7,19 @@ from typing import Union
 
 import dotenv
 
+from .cmd import call_cmd
 from .. import CFX_DOTENV_FILENAME
 from .. import SESSIONS_DIR
-from .cmd import call_cmd
 from ..typing import PATHLIKE
+
 dotenv.load_dotenv(CFX_DOTENV_FILENAME)
 
 logger = logging.getLogger('cfdtoolbox')
 
-CFX5PRE = os.environ.get("cfx5pre")
+CFX5PRE = pathlib.Path(os.environ.get("cfx5pre"))
 
 
-def cfx2def(cfx_filename: PATHLIKE, def_filename: Union[PATHLIKE, None]=None):
+def cfx2def(cfx_filename: PATHLIKE, def_filename: Union[PATHLIKE, None] = None) -> pathlib.Path:
     if def_filename is None:
         def_filename = cfx_filename.parent.joinpath(f'{cfx_filename.stem}.def')
 
@@ -27,6 +28,8 @@ def cfx2def(cfx_filename: PATHLIKE, def_filename: Union[PATHLIKE, None]=None):
     replace_in_file(_tmp_session_filename, '__cfxfilename__', str(cfx_filename))
     replace_in_file(_tmp_session_filename, '__deffilename__', str(def_filename))
     play_session(_tmp_session_filename)
+    return def_filename
+
 
 def change_timestep_and_write_def(cfx_filename: PATHLIKE, def_filename: PATHLIKE, timestep: float):
     """changes timestep in *.cfx fil and writes solver file *.def"""
@@ -36,6 +39,7 @@ def change_timestep_and_write_def(cfx_filename: PATHLIKE, def_filename: PATHLIKE
     replace_in_file(_tmp_session_filename, '__timestep__', str(timestep))
     replace_in_file(_tmp_session_filename, '__deffilename__', str(def_filename))
     play_session(_tmp_session_filename)
+
 
 def change_timestep(cfx_filename: PATHLIKE, timestep: float):
     """changes timestep in *.cfx file. DOES NOT WRITE THE *.DEF FILE!"""
@@ -89,8 +93,7 @@ def replace_in_file(filename, keyword, new_string):
     with open(filename) as f:
         s = f.read()
         if keyword not in s:
-            logger.debug('"{keyword}" not found in {filename}.'.format(**locals()))
-            return
+            raise KeyError('"{keyword}" not found in {filename}.'.format(**locals()))
 
     with open(filename, 'w') as f:
         logger.debug('Changing "{keyword}" to "{new_string}" in {filename}'.format(**locals()))
@@ -98,8 +101,8 @@ def replace_in_file(filename, keyword, new_string):
         f.write(s)
 
 
-def play_session(session_file: Union[str, bytes, os.PathLike, pathlib.Path],
-                 cfx5pre: Union[str, bytes, os.PathLike, pathlib.Path] = None) -> None:
+def play_session(session_file: PATHLIKE,
+                 cfx5pre: Union[PATHLIKE, None] = None) -> None:
     """
     Runs cfx5pre session file
 
@@ -110,15 +113,15 @@ def play_session(session_file: Union[str, bytes, os.PathLike, pathlib.Path],
         Default takes from config file
     """
     if cfx5pre is None:
-        _cfx5path = pathlib.Path(CFX5PRE)
-    else:
         _cfx5path = CFX5PRE
+    else:
+        _cfx5path = pathlib.Path(cfx5pre)
 
     if not _cfx5path.exists():
         raise FileExistsError(f'Could not find cfx5pre exe here: {_cfx5path}')
 
     session_file = pathlib.Path(session_file)
 
-    cmd = f"{_cfx5path} -batch {session_file}"
+    cmd = f'"{_cfx5path}" -batch "{session_file}"'
     call_cmd(cmd)
     return cmd

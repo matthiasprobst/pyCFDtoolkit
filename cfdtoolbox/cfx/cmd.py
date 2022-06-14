@@ -1,5 +1,6 @@
 import logging
 import os
+import platform
 import shlex
 import subprocess
 
@@ -7,7 +8,10 @@ logger = logging.getLogger(__package__)
 
 
 def call_cmd(cmd, wait=True):
-    logger.error(f'Under windows wait has no effect. The system will always wait until the batch command has finished')
+    logger.debug(cmd)
+    if platform.system().lower() == 'windows' and wait:
+        logger.error('Under windows wait has no effect.'
+                     ' The system will always wait until the batch command has finished')
     cmd_split = shlex.split(cmd)
     if wait:
         # waits for the command to complete
