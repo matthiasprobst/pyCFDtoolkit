@@ -23,3 +23,8 @@ def change_suffix(filename: PATHLIKE, new_suffix: str) -> pathlib.Path:
     if new_suffix[0] != '.':
         new_suffix = '.' + new_suffix
     return filename.parent.joinpath(f'{filename.stem}{new_suffix}')
+
+
+def touch_stp(directory):
+    with open(pathlib.Path(directory).joinpath('stp'), 'w') as _:
+        pass

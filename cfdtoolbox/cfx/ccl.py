@@ -249,7 +249,7 @@ class CCLTextFile:
             if grp.group_type == 'FLOW':
                 return grp
 
-    def to_hdf(self, hdf_filename: Union[PATHLIKE, None], overwrite=True):
+    def to_hdf(self, hdf_filename: Union[PATHLIKE, None] = None, overwrite=True):
         if hdf_filename is None:
             hdf_filename = change_suffix(self.filename, '.hdf')
         else:
@@ -441,7 +441,7 @@ class CCLHDFFlowGroup(CCLHDFGroup):
     #     return CCLHDFOutputControlGroup(self.path, self.filename)
 
 
-class CCLHDFFile:
+class CCLFile:
     """Interface class to the HDF file containing CCL data"""
 
     def __init__(self, filename: PATHLIKE):

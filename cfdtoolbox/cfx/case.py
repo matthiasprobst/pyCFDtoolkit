@@ -1,6 +1,6 @@
+import logging
 import os
 import pathlib
-import shlex
 import shutil
 import time
 from dataclasses import dataclass
@@ -10,12 +10,16 @@ from warnings import warn
 import dotenv
 
 from . import solve
-from .ccl import CCLTextFile, CCLHDFGroup
-from .ccl import generate as generate_ccl
-from .core import AnalysisType, CFXResFile, CFXResFiles, touch_stp, _predict_new_res_filename, CFXDefFile
+from .ccl import CCLFile
+from .cmd import call_cmd
+from .core import AnalysisType
+from .result import CFXResFile, CFXResFiles, _predict_new_res_filename
+from .utils import touch_stp
+from .definition import CFXDefFile
 from .core import CFXFile
 from .. import CFX_DOTENV_FILENAME
-from .cmd import call_cmd
+
+logger = logging.getLogger(__package__)
 dotenv.load_dotenv(CFX_DOTENV_FILENAME)
 AUXDIRNAME = '.pycfdtoolbox'
 
@@ -66,6 +70,18 @@ class CFXCase(CFXFile):
             raise NotADirectoryError('The working directory does not exist. Can only work with existing cases!')
         self._scan_for_files()
 
+        # generate the .ccl file from the .def file if exists and younger than .cfx file
+        # otherwise built from .cfx file
+        if self.def_file.filename.exists():
+            if self.def_file.filename.stat().st_mtime > self.filename.stat().st_mtime:
+                self.ccl = self.def_file.generate_ccl()
+            else:
+                logger.info('The definition file is older than the cfx file. Writig new .def file and .ccl file')
+                self.def_file.update()
+                self.ccl = CCLFile(self.filename)
+        else:
+            self.ccl = CCLFile(self.filename)
+
     @property
     def timestep(self):
         """returns the time step of the registered def file thus calls timestep property of CFXDefFile instance"""
@@ -106,13 +122,6 @@ class CFXCase(CFXFile):
             return AnalysisType.STEADYSTATE
         return AnalysisType.TRANSIENT
 
-    # def write_ccl_file(self, ccl_filename=None, overwrite=True):
-    #     """writes a ccl file from a *.cfx file"""
-    #     if ccl_filename is None:
-    #         ccl_filename = self.aux_dir.joinpath(f'{self.filename.stem}.ccl')
-    #     return CCLFile(generate_ccl(input_file=self.def_file.filename, ccl_filename=ccl_filename,
-    #                                 cfx5pre=None, overwrite=overwrite))
-
     def stop(self, wait: bool = True, timeout: int = 600):
         """touches a stp-file in the working directory"""
         list_of_dir_names = list(self.working_dir.glob('*.dir'))
@@ -121,7 +130,7 @@ class CFXCase(CFXFile):
                 touch_stp(d)
 
         if len(list_of_dir_names) == 0:
-            print('No *.dir names found.')
+            print('Nothing to stop.')
             return
 
         if wait:
