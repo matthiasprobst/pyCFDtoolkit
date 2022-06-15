@@ -1,4 +1,5 @@
 import pathlib
+from os import utime
 from typing import Tuple
 
 from ..typing import PATHLIKE
@@ -25,9 +26,10 @@ def change_suffix(filename: PATHLIKE, new_suffix: str) -> pathlib.Path:
     return filename.parent.joinpath(f'{filename.stem}{new_suffix}')
 
 
-def touch_stp(directory):
-    with open(pathlib.Path(directory).joinpath('stp'), 'w') as _:
-        pass
+def touch_stp(directory, times=None):
+    with open(f'{directory}/stp', 'a'):
+        utime('stp', times)
+
 
 def capitalize_phrase(phrase: str) -> str:
     """Returns the phrase where every first letter of a word is capitalized"""
