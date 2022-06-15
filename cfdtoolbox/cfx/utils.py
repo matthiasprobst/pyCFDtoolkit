@@ -28,3 +28,7 @@ def change_suffix(filename: PATHLIKE, new_suffix: str) -> pathlib.Path:
 def touch_stp(directory):
     with open(pathlib.Path(directory).joinpath('stp'), 'w') as _:
         pass
+
+def capitalize_phrase(phrase: str) -> str:
+    """Returns the phrase where every first letter of a word is capitalized"""
+    return ' '.join([s.capitalize() for s in phrase.split(' ')])

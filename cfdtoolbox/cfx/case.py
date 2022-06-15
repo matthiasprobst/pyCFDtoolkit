@@ -9,15 +9,17 @@ from warnings import warn
 
 import dotenv
 
+from . import session
 from . import solve
 from .ccl import CCLFile
 from .cmd import call_cmd
 from .core import AnalysisType
+from .core import CFXFile
+from .definition import CFXDefFile
 from .result import CFXResFile, CFXResFiles, _predict_new_res_filename
 from .utils import touch_stp
-from .definition import CFXDefFile
-from .core import CFXFile
 from .. import CFX_DOTENV_FILENAME
+from ..typing import PATHLIKE
 
 logger = logging.getLogger(__package__)
 dotenv.load_dotenv(CFX_DOTENV_FILENAME)
@@ -56,18 +58,15 @@ class CFXCase(CFXFile):
     def __getitem__(self, item):
         return self.res_files[item]
 
-    def __post_init__(self):
-        """
-        Avoids error when multiple cfx files are available in
-        one folder, e.g. *._frz, *_trn.cfx
-        """
-        super().__post_init__()
+    def update(self):
+        """Mainly scans for all relevant case files and updates content if needed"""
         if not self.filename.suffix == '.cfx':
             raise ValueError(f'Expected suffix .cfx and not {self.filename.suffix}')
         self.working_dir = self.filename.parent
 
         if not self.working_dir.exists():
             raise NotADirectoryError('The working directory does not exist. Can only work with existing cases!')
+
         self._scan_for_files()
 
         # generate the .ccl file from the .def file if exists and younger than .cfx file
@@ -81,6 +80,14 @@ class CFXCase(CFXFile):
                 self.ccl = CCLFile(self.filename)
         else:
             self.ccl = CCLFile(self.filename)
+
+    def __post_init__(self):
+        """
+        Avoids error when multiple cfx files are available in
+        one folder, e.g. *._frz, *_trn.cfx
+        """
+        super().__post_init__()
+        self.update()
 
     @property
     def timestep(self):
@@ -100,10 +107,7 @@ class CFXCase(CFXFile):
     @property
     @update_cfx_case
     def latest(self):
-        if len(self.res_files) > 0:
-            return self.res_files[-1]
-        else:
-            raise ValueError('No result files registered!')
+        self.res_files.latest
 
     @update_cfx_case
     def is_latest(self):
@@ -166,6 +170,11 @@ class CFXCase(CFXFile):
         else:  # path is given
             _init = CFXResFile(filename=initial_result_file, def_file=self.def_file)
         return _init.resume(nproc, timeout, wait=wait)
+
+    def import_ccl(self, ccl_filename: Union[PATHLIKE, None] = None):
+        """Imports a .ccl file into a .cfx file and saves the .cfx file"""
+        _ = session.importccl(self.filename, ccl_filename)
+        self.update()
 
     def _scan_for_files(self):
         """scans for cfx files (.cfx and .res and .def, and .ccl)"""

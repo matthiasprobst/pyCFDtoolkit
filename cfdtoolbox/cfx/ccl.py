@@ -3,7 +3,7 @@ import os
 import pathlib
 import shutil
 from dataclasses import dataclass
-from typing import Union
+from typing import Union, List
 
 import dotenv
 import h5py
@@ -14,7 +14,7 @@ from h5wrapperpy._html.html_repr import h5file_html_repr
 from . import session
 from .cmd import call_cmd
 from .session import cfx2def
-from .utils import change_suffix
+from .utils import change_suffix, capitalize_phrase
 from .. import CFX_DOTENV_FILENAME, SESSIONS_DIR
 from ..typing import PATHLIKE
 
@@ -197,12 +197,12 @@ def hdf_to_ccl(hdf_filename: PATHLIKE, ccl_filename: Union[PATHLIKE, None] = Non
         _spaces = ''.join([' '] * nlevel * intendation_step)
         name_stem = pathlib.Path(h5obj.name).stem
         if ':' in name_stem:
-            ret_string += _spaces + name_stem + '\n'
+            ret_string += _spaces + name_stem.upper() + '\n'
         else:
-            ret_string += _spaces + name_stem + ':\n'
+            ret_string += _spaces + name_stem.upper() + ':\n'
 
         for _k, _v in h5obj.attrs.items():
-            ret_string += _spaces.join([' '] * intendation_step) + f' {_k} = {_v}\n'
+            ret_string += _spaces.join([' '] * intendation_step) + f' {_k.capitalize()} = {capitalize_phrase(_v)}\n'
 
         writer.write(ret_string)
 
@@ -342,17 +342,28 @@ class CCLHDFGroup:
         return CCLHDFAttributWrapper(self.filename, self.path, attr_dict)
 
     def __repr__(self):
-        return self.path
+        return f'CCLHDFGroup {self.path} of file {self.filename}'
 
     def __str__(self):
-        print('line repr of group content --> see h5wrappery')
+        return self.__repr__()
+
+    def _repr_html_(self):
+        with h5py.File(self.filename) as h5:
+            return h5file_html_repr(h5[self.path], 50)
 
     def dump(self):
         with h5py.File(self.filename) as h5:
             display(HTML((h5file_html_repr(h5[self.path], 50))))
 
-    def _repr_html_(self):
-        return self.dump()
+    def __getattr__(self, item):
+        _item = item.replace('_', ' ')
+        with h5py.File(self.filename) as h5:
+            if _item in h5[self.path]:
+                return CCLHDFGroup(f'{self.path}/{_item.upper()}', self.filename)
+            else:
+                if _item.upper() in h5[self.path]:
+                    return CCLHDFGroup(f'{self.path}/{_item.upper()}', self.filename)
+        raise KeyError(f'{item} not found in {self.path}')
 
     def __getitem__(self, item):
         with h5py.File(self.filename) as h5:
@@ -462,20 +473,23 @@ class CCLFile:
         return CCLHDFGroup(item, self.filename)
 
     def __repr__(self):
-        return self.filename
+        return f'CCLFile {self.filename}'
 
     def __str__(self):
-        return self.__repr__()
+        return f'CCLFile {self.filename}'
 
     def dump(self):
+        """dumps the content in pretty html style (only in notebooks)"""
         with h5py.File(self.filename) as h5:
             display(HTML((h5file_html_repr(h5['/'], 50))))
 
     def _repr_html_(self):
-        return self.dump()
+        with h5py.File(self.filename) as h5:
+            return h5file_html_repr(h5['/'], 50)
 
     @property
-    def flow(self):
+    def flow(self) -> List[CCLHDFFlowGroup]:
+        """Returns a list of groups starting wiht 'FLOW: '"""
         return _list_of_instances_by_keyword_substring(self.filename, '/', 'FLOW: ', CCLHDFFlowGroup)
 
     def to_ccl(self, ccl_filename: Union[PATHLIKE, None]):

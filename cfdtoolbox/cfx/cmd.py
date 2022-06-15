@@ -10,7 +10,7 @@ logger = logging.getLogger(__package__)
 def call_cmd(cmd, wait=True):
     logger.debug(cmd)
     if platform.system().lower() == 'windows' and wait:
-        logger.error('Under windows wait has no effect.'
+        logger.debug('Under windows wait has no effect.'
                      ' The system will always wait until the batch command has finished')
     cmd_split = shlex.split(cmd)
     if wait:

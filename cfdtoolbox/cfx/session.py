@@ -8,6 +8,7 @@ from typing import Union
 import dotenv
 
 from .cmd import call_cmd
+from .utils import change_suffix
 from .. import CFX_DOTENV_FILENAME
 from .. import SESSIONS_DIR
 from ..typing import PATHLIKE
@@ -17,6 +18,31 @@ dotenv.load_dotenv(CFX_DOTENV_FILENAME)
 logger = logging.getLogger('cfdtoolbox')
 
 CFX5PRE = pathlib.Path(os.environ.get("cfx5pre"))
+
+
+def importccl(cfx_filename: PATHLIKE, ccl_filename: Union[PATHLIKE, None] = None) -> pathlib.Path:
+    """imports a .ccl file into a .cfx file"""
+    if ccl_filename is None:
+        ccl_filename = change_suffix(cfx_filename, '.ccl')
+    cfx_filename = pathlib.Path(cfx_filename)
+    if not cfx_filename.exists():
+        raise FileExistsError(f'CFX case file (.cfx) not found: {cfx_filename}')
+    if not ccl_filename.exists():
+        raise FileExistsError(f'CCL file (.ccl) not found: {cfx_filename}')
+
+    logger.debug(f'Importing ccl file into case file: "{ccl_filename} --> {cfx_filename}')
+
+    mtime_before = cfx_filename.stat().st_mtime
+    _orig_session_filename = SESSIONS_DIR.joinpath('importccl.pre')
+    _tmp_session_filename = copy_session_file_to_tmp(_orig_session_filename)
+    replace_in_file(_tmp_session_filename, '__cfxfilename__', str(cfx_filename))
+    replace_in_file(_tmp_session_filename, '__cclfilename__', str(ccl_filename))
+
+    play_session(_tmp_session_filename)
+    # now check if .cfx file modification time has changed
+    if cfx_filename.stat().st_mtime <= mtime_before:
+        raise ValueError('Failed importing ccl file')
+    return cfx_filename
 
 
 def cfx2def(cfx_filename: PATHLIKE, def_filename: Union[PATHLIKE, None] = None) -> pathlib.Path:

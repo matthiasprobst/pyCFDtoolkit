@@ -173,4 +173,3 @@ class CFXResFiles:
             return self[-1]
         else:
             return None
-            # return FutureCFXResFile(self.def_file)

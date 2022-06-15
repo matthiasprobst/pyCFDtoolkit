@@ -20,7 +20,7 @@ class CFXDefFile(CFXFile):
             self.update()
         if self.filename.stat().st_mtime < self.get_cfx_filename().stat().st_mtime:
             logger.info(f'The .def file is out of date ({self.filename.stat().st_mtime} < '
-                        f'{self.get_cfx_filename().stat().st_mtime}. Creating anew one...')
+                        f'{self.get_cfx_filename().stat().st_mtime}. Creating a new one...')
             self.update()
 
     def get_cfx_filename(self):
