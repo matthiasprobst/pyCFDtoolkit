@@ -5,7 +5,6 @@ import shutil
 import time
 from dataclasses import dataclass
 from typing import Union
-from warnings import warn
 
 import dotenv
 
@@ -17,6 +16,7 @@ from .core import AnalysisType
 from .core import CFXFile
 from .definition import CFXDefFile
 from .result import CFXResFile, CFXResFiles, _predict_new_res_filename
+from .utils import change_suffix
 from .utils import touch_stp
 from .. import CFX_DOTENV_FILENAME
 from ..typing import PATHLIKE
@@ -30,7 +30,7 @@ CFX5SOLVE = os.environ.get("cfx5solve")
 
 def update_cfx_case(func):
     def update_cfx_case_wrapper(*args, **kwargs):
-        args[0]._scan_res_files()
+        args[0].update()
         return func(*args, **kwargs)
 
     return update_cfx_case_wrapper
@@ -38,7 +38,14 @@ def update_cfx_case(func):
 
 @dataclass
 class CFXCase(CFXFile):
-    """Class wrapped around the *.cfx case file"""
+    """Class wrapped around the *.cfx case file.
+
+    Case assumtions:
+    ----------------
+    The case file (.cfx) and the definition file ('.def') have the same stem, e.g.:
+    `mycase.cfx` and `mycase.def`.
+    The result files (.res) will look like `mycase_001.res` and `maycase_002.res` and so on.
+    """
 
     @update_cfx_case
     def __repr__(self):
@@ -62,24 +69,31 @@ class CFXCase(CFXFile):
         """Mainly scans for all relevant case files and updates content if needed"""
         if not self.filename.suffix == '.cfx':
             raise ValueError(f'Expected suffix .cfx and not {self.filename.suffix}')
+
         self.working_dir = self.filename.parent
 
         if not self.working_dir.exists():
             raise NotADirectoryError('The working directory does not exist. Can only work with existing cases!')
 
-        self._scan_for_files()
+        def_filename_list = change_suffix(self.filename, '.def')
+        self.def_file = CFXDefFile(self.guess_definition_filename())
 
-        # generate the .ccl file from the .def file if exists and younger than .cfx file
-        # otherwise built from .cfx file
-        if self.def_file.filename.exists():
-            if self.def_file.filename.stat().st_mtime > self.filename.stat().st_mtime:
-                self.ccl = self.def_file.generate_ccl()
-            else:
-                logger.info('The definition file is older than the cfx file. Writig new .def file and .ccl file')
-                self.def_file.update()
-                self.ccl = CCLFile(self.filename)
-        else:
-            self.ccl = CCLFile(self.filename)
+        res_filename_list = list(self.working_dir.glob(f'{self.filename.stem}*.res'))
+        self.res_files = CFXResFiles(res_filename_list, self.def_file)
+
+        self.ccl = CCLFile(self.filename)
+
+        # # generate the .ccl file from the .def file if exists and younger than .cfx file
+        # # otherwise built from .cfx file
+        # if self.def_file.filename.exists():
+        #     if self.def_file.filename.stat().st_mtime > self.filename.stat().st_mtime:
+        #         self.ccl = self.def_file.generate_ccl()
+        #     else:
+        #         logger.info('The definition file is older than the cfx file. Writig new .def file and .ccl file')
+        #         self.def_file.update()
+        #         self.ccl = CCLFile(self.filename)
+        # else:
+        #     self.ccl = CCLFile(self.filename)
 
     def __post_init__(self):
         """
@@ -126,8 +140,8 @@ class CFXCase(CFXFile):
             return AnalysisType.STEADYSTATE
         return AnalysisType.TRANSIENT
 
-    def stop(self, wait: bool = True, timeout: int = 600):
-        """touches a stp-file in the working directory"""
+    def stop(self, wait: bool = True, timeout: int = 600) -> bool:
+        """touches a stp-file in the working directory. Returns True if file was detected, False if not"""
         list_of_dir_names = list(self.working_dir.glob('*.dir'))
         for d in list_of_dir_names:
             if self.def_file.stem == d.stem[:-4]:
@@ -140,18 +154,13 @@ class CFXCase(CFXFile):
         if wait:
             new_filename = _predict_new_res_filename(self.filename)
             print(f'waiting for {new_filename}')
-            time_count = 0
-            _break = False
-            while not new_filename.exists():
+            for i in range(timeout):
                 time.sleep(1)  # 1s
-                time_count += 1
-                if time_count > timeout:
-                    _break = True
-                    break
-            if _break:
-                print(f'Waited {timeout} seconds but did not find {new_filename} during in the meantime.')
-            else:
+            if new_filename.exists():
                 print(f'... file has been detected')
+            print(f'Waited {timeout} seconds but did not find {new_filename} during in the meantime.')
+            return False
+        return True
 
     def start(self, initial_result_file: Union[None, CFXResFile, str, bytes, os.PathLike, pathlib.Path],
               nproc: int, timeout: int = None, wait: bool = False) -> str:
@@ -176,24 +185,9 @@ class CFXCase(CFXFile):
         _ = session.importccl(self.filename, ccl_filename)
         self.update()
 
-    def _scan_for_files(self):
-        """scans for cfx files (.cfx and .res and .def, and .ccl)"""
-        def_filename_list = list(self.working_dir.glob(f'{self.filename.stem}.def'))
-        if len(def_filename_list) > 1:
-            raise ValueError(
-                f'The case has multiple ({len(def_filename_list)}) *.def files. Only one is expected and allowed')
-        if len(def_filename_list) == 1:
-            self.def_file = CFXDefFile(def_filename_list[0])
-            if self.def_file.stem != self.filename.stem:
-                warn('The name of the case file and the definition file are different. This is unusual: '
-                     f'{self.filename.name} vs. {self.def_file.name}')
-        else:  # == 0
-            self.def_file = CFXDefFile(self.guess_definition_filename())
-        self._scan_res_files()
-
-    def _scan_res_files(self):
-        res_filename_list = list(self.working_dir.glob(f'{self.filename.stem}*.res'))
-        self.res_files = CFXResFiles(res_filename_list, self.def_file)
+    # def _scan_res_files(self):
+    #     res_filename_list = list(self.working_dir.glob(f'{self.filename.stem}*.res'))
+    #     self.res_files = CFXResFiles(res_filename_list, self.def_file)
 
     def guess_definition_filename(self):
         return self.working_dir.joinpath(f'{self.filename.stem}.def')

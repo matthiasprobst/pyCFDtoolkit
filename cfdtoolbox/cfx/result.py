@@ -112,7 +112,7 @@ class CFXResFile(CFXFile):
         current_number = self.number
         return self.filename.parent.joinpath(f'{str(self.filename.stem)[:-3]}{current_number + 1:03d}.dir')
 
-    def stop(self, wait=True, timeout=600):
+    def stop(self, wait: bool = True, timeout: int = 600) -> bool:
         """stops a current run. If wait is True, the method will wait until the *.res file exists.
         Timeout is set to 600 seconds. If in this time no file res file is written, there might
         have been an error..."""
@@ -126,18 +126,14 @@ class CFXResFile(CFXFile):
             raise NotADirectoryError(f'Failed touching a stp-file: {dirname}')
         if wait:
             print(f'waiting for {new_filename}')
-            time_count = 0
-            _break = False
-            while not new_filename.exists():
+            for i in range(timeout):
                 time.sleep(1)  # 1s
-                time_count += 1
-                if time_count > timeout:
-                    _break = True
-                    break
-            if _break:
-                print(f'Waited {timeout} seconds but did not find {new_filename} during in the meantime.')
-            else:
+            if new_filename.exists():
                 print(f'... file has been detected')
+                return True
+            print(f'Waited {timeout} seconds but did not find {new_filename} during in the meantime.')
+            return False
+        return True
 
 
 # @dataclass

@@ -27,10 +27,6 @@ class CFXFile:
     filename: Union[str, bytes, os.PathLike, pathlib.Path]
 
     @property
-    def name(self):
-        return self.filename.name
-
-    @property
     def stem(self):
         return self.filename.stem
 

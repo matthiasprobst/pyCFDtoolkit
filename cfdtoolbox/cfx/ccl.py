@@ -12,6 +12,7 @@ from IPython.display import display, HTML
 from h5wrapperpy._html.html_repr import h5file_html_repr
 
 from . import session
+from .boundary_conditions import CFXBoundaryCondition
 from .cmd import call_cmd
 from .session import cfx2def
 from .utils import change_suffix, capitalize_phrase
@@ -67,7 +68,7 @@ class CCLGroup:
         self.group_type = None
         if name is None:
             _name = self.all_lines[self.grp_line].strip()
-            if _name[-1] == ':':
+            if _name.endswith(':'):
                 self.name = _name[:-1]
             else:
                 self.name = _name
@@ -104,7 +105,8 @@ class CCLGroup:
                 value = linedata[1].strip()
                 data[linedata[0].strip()] = CCLDataField(self.filename, self.grp_line + 1 + iline, name, value)
             else:
-                break  # all options are at top of a group. once there is a line without "=" the next group begins...
+                # all options are at top of a group. once there is a line without "=" the next group begins...
+                return data
         return data
 
     @property
@@ -124,7 +126,6 @@ class CCLGroup:
                     # append line number indent and
                     found.append((i[0], i[1] - 1))
                     # print(i)
-
         afound = np.asarray([f[0] for f in found])
         if len(afound) > 1:
             for (a, b) in zip(found[0:], found[1:]):
@@ -197,9 +198,9 @@ def hdf_to_ccl(hdf_filename: PATHLIKE, ccl_filename: Union[PATHLIKE, None] = Non
         _spaces = ''.join([' '] * nlevel * intendation_step)
         name_stem = pathlib.Path(h5obj.name).stem
         if ':' in name_stem:
-            ret_string += _spaces + name_stem.upper() + '\n'
+            ret_string += f'{_spaces}{name_stem.upper()}\n'
         else:
-            ret_string += _spaces + name_stem.upper() + ':\n'
+            ret_string += f'{_spaces}{name_stem.upper()}:\n'
 
         for _k, _v in h5obj.attrs.items():
             ret_string += _spaces.join([' '] * intendation_step) + f' {_k.capitalize()} = {capitalize_phrase(_v)}\n'
@@ -209,7 +210,7 @@ def hdf_to_ccl(hdf_filename: PATHLIKE, ccl_filename: Union[PATHLIKE, None] = Non
         for _v in h5obj.values():
             _write_to_file(writer, _v)
 
-        ret_string = _spaces + 'END\n'
+        ret_string = f'{_spaces}END\n'
         writer.write(ret_string)
 
     with open(ccl_filename, 'w') as f:
@@ -330,10 +331,11 @@ class CCLHDFAttributWrapper:
         return str(self.values)
 
 
-@dataclass
 class CCLHDFGroup:
-    path: str
-    filename: PATHLIKE
+
+    def __init__(self, path: str, filename: PATHLIKE):
+        self.path = path
+        self.filename = filename
 
     @property
     def options(self):
@@ -349,7 +351,7 @@ class CCLHDFGroup:
 
     def _repr_html_(self):
         with h5py.File(self.filename) as h5:
-            return h5file_html_repr(h5[self.path], 50)
+            return h5file_html_repr(h5[self.path], 50, collapsed=False)
 
     def dump(self):
         with h5py.File(self.filename) as h5:
@@ -398,13 +400,25 @@ class CCLHDFGroup:
             return self.__class__(_new_path, self.filename)
 
 
-@dataclass
 class CCLHDFBoundaryCondition(CCLHDFGroup):
     pass
 
 
-@dataclass
 class CCLHDFBoundary(CCLHDFGroup):
+
+    def __repr__(self):
+        return f'Boundary "{self.name}"\n> type: {self.type}'
+
+    @property
+    def name(self):
+        """Returns boundary name defined by user"""
+        return pathlib.Path(self.path).stem.split(':', 1)[1]
+
+    @property
+    def type(self):
+        """Returns boundary type, e.g. INLET"""
+        with h5py.File(self.filename) as h5:
+            return h5[self.path].attrs['Boundary Type']
 
     @property
     def condition(self):
@@ -415,16 +429,48 @@ class CCLHDFBoundary(CCLHDFGroup):
     @condition.setter
     def condition(self, bdry):
         """Writes a new boundary condition to the HDF file"""
-        raise NotImplementedError()
+        if not isinstance(bdry, CFXBoundaryCondition):
+            raise TypeError(f'Must provide a instance of type {CFXBoundaryCondition}, not {type(bdry)}')
+        bdry.write(self.filename, self.path)
 
 
-@dataclass
 class CCLHDFDomainGroup(CCLHDFGroup):
+
+    @property
+    def name(self):
+        return pathlib.Path(self.path).stem.split(':', 1)[1]
 
     @property
     def boundaries(self):
         """returns domain groups"""
         return _list_of_instances_by_keyword_substring(self.filename, self.path, 'BOUNDARY: ', CCLHDFBoundary)
+
+    def boundary(self, name):
+        return self.boundaries[name]
+
+    def get_boundary_type(self, bdry_type: str, squeeze: bool = True) -> Union[CCLHDFBoundary, List[CCLHDFBoundary]]:
+        """Filters for a specific boundary type
+
+        Parameters
+        ---------
+        bdry_type: str
+            Name of the boundary type, e.g. 'inlet'
+        squeeze: bool, optional=True
+            Whether to return a CCLHDFBoundary instance if only one boundary was found instead of
+            returnig a list of only one item.
+
+        Returns
+        -------
+        Depends on parameter squeeze. Generally a list of found boundaries is returned. If squeeze and
+        only one boundary was found, the instance is returned instead of a list of a single item.
+        """
+        found = []
+        for bry in self.boundaries:
+            if bry.type.lower() == bdry_type.lower():
+                found.append(bry)
+        if len(found) == 1 and squeeze:
+            return found[0]
+        return found
 
     def parent(self):
         if self.path == '/':
@@ -436,13 +482,37 @@ class CCLHDFDomainGroup(CCLHDFGroup):
             return CCLHDFGroup(parent_path, self.filename)
 
 
-@dataclass
 class CCLHDFFlowGroup(CCLHDFGroup):
 
     @property
     def domains(self):
         """returns domain groups"""
         return _list_of_instances_by_keyword_substring(self.filename, self.path, 'DOMAIN: ', CCLHDFDomainGroup)
+
+    def get_boundary_type(self, bdry_type: str, squeeze: bool = True) -> Union[CCLHDFBoundary, List[CCLHDFBoundary]]:
+        """Filters for a specific boundary type. Walks thorugh all domains
+
+        Parameters
+        ---------
+        bdry_type: str
+            Name of the boundary type, e.g. 'inlet'
+        squeeze: bool, optional=True
+            Whether to return a CCLHDFBoundary instance if only one boundary was found instead of
+            returnig a list of only one item.
+
+        Returns
+        -------
+        Depends on parameter squeeze. Generally a list of found boundaries is returned. If squeeze and
+        only one boundary was found, the instance is returned instead of a list of a single item.
+        """
+        found = []
+        for domain in self.domains:
+            for bry in self.boundaries:
+                if bry.type.lower() == bdry_type.lower():
+                    found.append(bry)
+        if len(found) == 1 and squeeze:
+            return found[0]
+        return found
 
     # @property
     # def solver_control(self):
@@ -456,6 +526,7 @@ class CCLFile:
     """Interface class to the HDF file containing CCL data"""
 
     def __init__(self, filename: PATHLIKE):
+        logger.info('reading ccl')
         filename = pathlib.Path(filename)
         if filename.suffix == '.hdf':
             self.filename = filename
