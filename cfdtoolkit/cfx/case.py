@@ -23,7 +23,6 @@ from ..typing import PATHLIKE
 
 logger = logging.getLogger(__package__)
 dotenv.load_dotenv(CFX_DOTENV_FILENAME)
-AUXDIRNAME = '.pycfdtoolbox'
 
 CFX5SOLVE = os.environ.get("cfx5solve")
 

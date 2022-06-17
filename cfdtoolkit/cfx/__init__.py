@@ -4,6 +4,7 @@ from pathlib import Path
 
 from .case import CFXCase
 
+AUXDIRNAME = '.cfdtoolkit'
 
 def check_installation():
     """checks if exe are findable"""
