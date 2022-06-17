@@ -8,7 +8,7 @@ import dotenv
 import pandas as pd
 import xarray as xr
 from numpy.typing import ArrayLike
-from . import AUXDIRNAME
+from .. import AUXDIRNAME
 from . import mon
 from .out import extract_out_data, mesh_info_from_file
 from .. import CFX_DOTENV_FILENAME
@@ -43,7 +43,7 @@ class CFXFile:
         else:
             self.aux_dir = self.working_dir.joinpath(AUXDIRNAME)
         if not self.aux_dir.exists():
-            self.aux_dir.mkdir()
+            self.aux_dir.mkdir(parents=True)
 
 
 class CFXDir(CFXFile):

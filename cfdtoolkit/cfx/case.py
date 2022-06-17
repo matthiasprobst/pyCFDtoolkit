@@ -82,7 +82,7 @@ class CFXCase(CFXFile):
             new_filename.parent.mkdir(parents=True)
         if not new_filename.suffix == '.cfx':
             raise ValueError(f'The new filename has a wrong suffix. Expected .cfx: {new_filename}')
-        CFXCase(shutil.copy(self.filename, new_filename))
+        return CFXCase(shutil.copy(self.filename, new_filename))
 
     def rename(self, new_name: str) -> None:
         """renames all files of this case to the new name if still available (no conflict with existing files
@@ -153,6 +153,8 @@ class CFXCase(CFXFile):
         one folder, e.g. *._frz, *_trn.cfx
         """
         super().__post_init__()
+        if not self.filename.exists():
+            raise FileExistsError(f'CFX file does not exist: {self.filename}')
         self.update()
 
     @property

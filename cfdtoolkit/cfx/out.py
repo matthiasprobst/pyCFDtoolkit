@@ -83,7 +83,6 @@ def mesh_info_from_file(ansys_cfx_out_file) -> pd.DataFrame:
         line = lines[istart + iline].strip()
 
         if " Domain Name :" in line:
-            print(line)
             domain_name.append(line.split(":")[1].strip())
             domain_name_iline.append(iline)
 
