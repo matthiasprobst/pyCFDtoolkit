@@ -39,9 +39,9 @@ class CFXFile:
         self.working_dir = self.filename.parent.resolve()
 
         if self.filename.suffix == '.res':
-            self.aux_dir = self.working_dir.joinpath(f'.{self.filename.stem.rsplit("_", 1)[0]}.cfdtoolbox')
+            self.aux_dir = self.working_dir.joinpath(f'.cfdtoolbox')
         else:
-            self.aux_dir = self.working_dir.joinpath(f'.{self.filename.stem}.cfdtoolbox')
+            self.aux_dir = self.working_dir.joinpath(f'.cfdtoolbox')
         if not self.aux_dir.exists():
             self.aux_dir.mkdir()
 
