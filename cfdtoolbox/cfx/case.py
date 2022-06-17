@@ -47,6 +47,10 @@ class CFXCase(CFXFile):
     The result files (.res) will look like `mycase_001.res` and `maycase_002.res` and so on.
     """
 
+    @property
+    def name(self):
+        return self.filename.stem
+
     @update_cfx_case
     def __repr__(self):
         _outstr = f"Working dir: {self.filename.parent}"
@@ -64,6 +68,55 @@ class CFXCase(CFXFile):
     @update_cfx_case
     def __getitem__(self, item):
         return self.res_files[item]
+
+    def copy(self, new_name: Union[str, PATHLIKE]):
+        """copies this case .cfx file to a new location with a new name.
+        If a string is provided, the new file will be created at the same working directory.
+        A new instance of CFXCase is returned."""
+        if isinstance(new_name, str):
+            if not new_name.endswith('.cfx'):
+                new_name += '.cfx'
+            new_filename = self.working_dir.joinpath(new_name)
+        else:
+            new_filename = new_name
+        if not new_filename.parent.exists():
+            new_filename.parent.mkdir(parents=True)
+        if not new_filename.suffix == '.cfx':
+            raise ValueError(f'The new filename has a wrong suffix. Expected .cfx: {new_filename}')
+        CFXCase(shutil.copy(self.filename, new_filename))
+
+    def rename(self, new_name: str) -> None:
+        """renames all files of this case to the new name if still available (no conflict with existing files
+        in the working direcotry.
+        If succesful, it returns a new instance"""
+        if new_name.endswith('.cfx'):
+            new_name = new_name.rsplit('.cfx')[0]
+        new_filename = self.working_dir.joinpath(f'{new_name}.cfx').resolve()
+        if not new_filename.parent.exists():
+            new_filename.parent.mkdir(parents=True)
+
+        if new_filename == self.filename:
+            return
+
+        all_files = list(self.working_dir.glob(f'{self.stem}*'))
+
+        def change_stem(fname, new_stem):
+            stem = fname.stem
+            name = fname.name
+            _new_name = name.replace(stem, new_stem)
+            return pathlib.Path(fname.parent.joinpath(_new_name))
+
+        all_new_files = [change_stem(fname, new_name) for fname in all_files]
+
+        for new_fname in all_new_files:
+            if new_fname.exists():
+                raise FileExistsError(f'Cannot rename because found already such file: {new_fname}')
+
+        for s, t in zip(all_files, all_new_files):
+            s.rename(t)
+
+        self.filename = new_filename
+        self.update()
 
     def update(self):
         """Mainly scans for all relevant case files and updates content if needed"""
