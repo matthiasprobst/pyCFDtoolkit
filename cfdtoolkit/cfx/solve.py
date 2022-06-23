@@ -11,15 +11,15 @@ CFX5SOLVE = os.environ.get("cfx5solve")
 
 def build_cmd(def_filename, nproc, ini_filename, timeout):
     def_filename = pathlib.Path(def_filename)
-    cmd = f"{CFX5SOLVE}  -def {def_filename}"
+    cmd = f'"{CFX5SOLVE}"  -def "{def_filename}"'
 
     if ini_filename is not None:
-        cmd += f" -ini {ini_filename}"
+        cmd += f' -ini "{ini_filename}"'
 
-    cmd += f" -chdir {def_filename.parent}"
+    cmd += f' -chdir "{def_filename.parent}"'
 
     if nproc > 1:
-        cmd += f" -par-local -partition {int(nproc)} -batch"
+        cmd += f' -par-local -partition {int(nproc)} -batch'
 
     if timeout is not None:
         if timeout <= 0:

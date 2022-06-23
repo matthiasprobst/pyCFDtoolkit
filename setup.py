@@ -1,8 +1,8 @@
 import setuptools
 
-from cfdtoolbox._version import __version__
+from cfdtoolkit._version import __version__
 
-name = 'pyCFDtoolbox'
+name = 'pyCFDtoolkit'
 __author__ = 'Matthias Probst'
 
 with open("README.md", "r") as fh:
@@ -13,10 +13,10 @@ setuptools.setup(
     version=__version__,
     author="Matthias Probst",
     author_email="matthias.probst@kit.edu",
-    description="Toolbox mainly for controlling CFD software using python",
+    description="Toolkit to manag and post-process CFD runs",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/MatthiasProbst/pyCFDtoolbox",
+    url="https://github.com/MatthiasProbst/pyCFDtoolkit",
     packages=setuptools.find_packages(),
     package_data={},
     classifiers=[

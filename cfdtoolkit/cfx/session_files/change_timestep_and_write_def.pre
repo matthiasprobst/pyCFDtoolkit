@@ -1,7 +1,6 @@
 COMMAND FILE:
-  CFX Pre Version = 20.2
+  CFX Pre Version = __version__
 END
-
 >load filename=__cfxfilename__, mode=cfx, overwrite=yes
 > update
 

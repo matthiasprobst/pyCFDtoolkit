@@ -1,0 +1,13 @@
+COMMAND FILE:
+  CFX Pre Version = __version__
+END
+
+>load filename=__cfxfilename__, mode=cfx, overwrite=yes
+> update
+
+>importccl filename=__cclfilename__, mode = replace, autoLoadLibrary = none
+> update
+
+>writeCaseFile
+> update
+

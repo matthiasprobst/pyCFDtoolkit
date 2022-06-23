@@ -5,6 +5,7 @@ from pathlib import Path
 
 import dotenv
 
+from .cmd import call_cmd
 from .. import CFX_DOTENV_FILENAME
 
 dotenv.load_dotenv(CFX_DOTENV_FILENAME)
@@ -23,11 +24,11 @@ def generate_userpoints_file(target: Path) -> Path:
     # target file is either *.res file or a dictionary *.dir in case simulation is still running
     basedir = target_filename.parent
     out_filename = Path.joinpath(basedir, "userpoints.csv")
-    bash_str = f'{CFX5MONDATA} -{target_filename.suffix[1:]} %{target_filename} -out %{out_filename}' \
-               f' -nocoeffloops -varrule "CATEGORY = USER POINT"'
+    cmd = f'{CFX5MONDATA} -{target_filename.suffix[1:]} %{target_filename} -out %{out_filename}' \
+          f' -nocoeffloops -varrule "CATEGORY = USER POINT"'
     if not out_filename.exists():
-        raise RuntimeError(f'Failed running bash script "{bash_str}"')
-    os.system(bash_str)
+        raise RuntimeError(f'Failed running bash script "{cmd}"')
+    os.system(cmd)
     return out_filename
 
 
@@ -68,16 +69,17 @@ def get_monitor_data_by_category(target: Path, category: MonitorCategory = Monit
         _units = '-units'
 
     if category.value:  # ==1 ==ALL
-        bash_str = f'{CFX5MONDATA} -{target_filename.suffix[1:]} "{target_filename}" -out' \
-                   f' "{out_filename}" {_units}'
+        cmd = f'"{CFX5MONDATA}" -{target_filename.suffix[1:]} "{target_filename}" -out' \
+              f' "{out_filename}" {_units}'
     else:
-        bash_str = f'{CFX5MONDATA} -{target_filename.suffix[1:]} "{target_filename}" ' \
-                   f'-varrule "CATEGORY = {str(category).replace("_", " ")}" -out {out_filename} {_units}'
+        cmd = f'"{CFX5MONDATA}" -{target_filename.suffix[1:]} "{target_filename}" ' \
+              f'-varrule "CATEGORY = {str(category).replace("_", " ")}" -out {out_filename} {_units}'
 
     logger.info(f'Generating user points file from "{target_filename.name}"')
-    logger.debug(f'Generating user points file with bash str: {bash_str}')
-    os.system(bash_str)
+    logger.debug(f'Generating user points file with bash str: {cmd}')
+
+    call_cmd(cmd, wait=True)
     if not out_filename.exists():
-        raise RuntimeError(f'Failed running bash script "{bash_str}"')
+        raise RuntimeError(f'Failed running bash script "{cmd}"')
 
     return out_filename
