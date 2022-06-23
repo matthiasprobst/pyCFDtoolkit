@@ -98,7 +98,7 @@ class CFXResFile(CFXFile):
 
         # creating an instance of CFXDefFile
         if def_filename is None:
-            def_filename = f'{self.case_stem}.def'
+            def_filename = pathlib.Path(f'{self.case_stem}.def')
             logger.debug(f'Resuming on def file: {def_filename}')
 
         if def_filename.exists():
