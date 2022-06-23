@@ -148,7 +148,7 @@ class CCLGroup:
                     del h5grp[self.name]
                 else:
                     raise ValueError('Group already exists and overwrite is set to False!')
-            logger.debug(f'Creating group with name {self.name} at level: {h5grp.name}')
+            # logger.debug(f'Creating group with name {self.name} at level: {h5grp.name}')
             g = h5grp.create_group(self.name)
 
         grp_lines = self.get_lines()
@@ -167,7 +167,7 @@ class CCLGroup:
                         grp_values_flag = False
 
         for name, subg in self.sub_groups.items():
-            logger.debug(name)
+            # logger.debug(name)
             subg.create_h5_group(g, overwrite=overwrite)
 
 
@@ -530,13 +530,13 @@ class CCLFile:
         Note: if the cfx file is younger than the ccl file, the ccl file will be rewritten
         from the cfx file! All data in the existing ccl hdf file will be overwritten.
         """
-        logger.debug('reading ccl')
+        # logger.debug('reading ccl')
         filename = pathlib.Path(filename)
         if filename.suffix == '.hdf':
             self.filename = filename
-            cfx_filename = change_suffix(filename, '.def')
+            cfx_filename = change_suffix(filename, '.cfx')
             if self.filename.stat().st_mtime < cfx_filename.stat().st_mtime:
-                logger.debug('CCL HDF file exists but out of date. generating new one from the cfx file')
+                # logger.debug('CCL HDF file exists but out of date. generating new one from the cfx file')
                 _ = CCLTextFile(generate(cfx_filename)).to_hdf(self.filename)
 
         elif filename.suffix == '.ccl':
@@ -610,7 +610,7 @@ def generate(input_file: PATHLIKE, ccl_filename: Union[PATHLIKE, None] = None,
 
     if ccl_filename is None:
         ccl_filename = change_suffix(input_file, '.ccl')
-    logger.debug(f'*.ccl input_file: {ccl_filename}')
+    # logger.debug(f'*.ccl input_file: {ccl_filename}')
 
     if input_file.suffix in ('.cfx', '.res'):
         # build def file and then call _generate_from_def

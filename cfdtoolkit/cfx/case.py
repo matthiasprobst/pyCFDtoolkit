@@ -58,7 +58,9 @@ class CFXCase(CFXFile):
         return self.filename.stem
 
     def __repr__(self):
-        self.update()
+        res_filename_list = list(self.working_dir.glob(f'{self.filename.stem}*.res'))
+        def_filename = change_suffix(self.filename, '.def')
+        self.res_files = CFXResFiles(filenames=res_filename_list, def_filename=def_filename)
         _outstr = f"Working dir: {self.filename.parent}"
         if len(self.res_files) == 0:
             _outstr += '\nNo result files yet'
