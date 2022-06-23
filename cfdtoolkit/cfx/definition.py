@@ -18,6 +18,9 @@ class CFXDefFile(CFXFile):
         if not self.filename.exists():
             logger.info('No .def file exists for the case. Creating one...')
             self.update()
+        if not self.filename.exists():
+            raise RuntimeError(f'Apparently there is still no definition file. cfx2def must have failed...'
+                               f'Is your license available?')
         if self.filename.stat().st_mtime < self.get_cfx_filename().stat().st_mtime:
             logger.info(f'The .def file is out of date ({self.filename.stat().st_mtime} < '
                         f'{self.get_cfx_filename().stat().st_mtime}. Creating a new one...')

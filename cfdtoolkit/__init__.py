@@ -1,7 +1,11 @@
 import pathlib
+import platform
 
 from ._logger import logger, _file_handler, _stream_handler
-import platform
+
+AUXDIRNAME = '.cfdtoolkit'
+
+
 USER_CONFIG_DIR = pathlib.Path.home() / ".config" / __package__
 
 if platform.system() == 'Windows':

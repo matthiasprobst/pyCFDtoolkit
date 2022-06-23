@@ -1,7 +1,7 @@
 import pathlib
 
-from cfdtoolbox.cfx.core import AnalysisType
-from cfdtoolbox.cfx import CFXCase
+from cfdtoolkit.cfx.core import AnalysisType
+from cfdtoolkit.cfx import CFXCase
 
 
 def test__scan_for_files():

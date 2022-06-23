@@ -21,7 +21,7 @@ from ..typing import PATHLIKE
 
 dotenv.load_dotenv(CFX_DOTENV_FILENAME)
 
-logger = logging.getLogger('cfdtoolbox')
+logger = logging.getLogger('cfdtoolkit')
 
 CFX5PRE = os.environ.get("cfx5pre")
 CFX5CMDS = os.environ.get("cfx5cmds")

@@ -5,6 +5,7 @@ from pathlib import Path
 from .case import CFXCase
 
 
+
 def check_installation():
     """checks if exe are findable"""
 

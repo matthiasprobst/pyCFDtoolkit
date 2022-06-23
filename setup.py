@@ -1,6 +1,6 @@
 import setuptools
 
-from cfdtoolbox._version import __version__
+from cfdtoolkit._version import __version__
 
 name = 'pyCFDtoolkit'
 __author__ = 'Matthias Probst'
