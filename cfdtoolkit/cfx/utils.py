@@ -43,4 +43,4 @@ def ansys_version_from_inst_dir(instdir: pathlib.Path) -> str:
 
     for part in instdir.parts:
         if p.match(part) is not None:
-            return part
+            return f'{part[1:3]}.{part[-1]}'
