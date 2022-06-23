@@ -58,9 +58,7 @@ class CFXCase(CFXFile):
         return self.filename.stem
 
     def __repr__(self):
-        res_filename_list = list(self.working_dir.glob(f'{self.filename.stem}*.res'))
-        def_filename = change_suffix(self.filename, '.def')
-        self.res_files = CFXResFiles(filenames=res_filename_list, def_filename=def_filename)
+        self.refresh_results()
         _outstr = f"Working dir: {self.filename.parent}"
         if len(self.res_files) == 0:
             _outstr += '\nNo result files yet'
@@ -68,6 +66,11 @@ class CFXCase(CFXFile):
             for i, res_file in enumerate(self.res_files):
                 _outstr += f"\n\t#{i:3d}: {res_file.filename.name}"
         return _outstr
+
+    def refresh_results(self):
+        res_filename_list = list(self.working_dir.glob(f'{self.filename.stem}*.res'))
+        def_filename = change_suffix(self.filename, '.def')
+        self.res_files = CFXResFiles(filenames=res_filename_list, def_filename=def_filename)
 
     def __str__(self):
         return self.__repr__()
@@ -176,7 +179,7 @@ class CFXCase(CFXFile):
     @property
     def latest(self):
         """Returns the latest .cfx file"""
-        self.update()
+        self.refresh_results()
         return self.res_files.latest
 
     @property
