@@ -526,16 +526,27 @@ class CCLFile:
     """Interface class to the HDF file containing CCL data"""
 
     def __init__(self, filename: PATHLIKE):
-        logger.info('reading ccl')
+        """
+        Note: if the cfx file is younger than the ccl file, the ccl file will be rewritten
+        from the cfx file! All data in the existing ccl hdf file will be overwritten.
+        """
+        logger.debug('reading ccl')
         filename = pathlib.Path(filename)
         if filename.suffix == '.hdf':
             self.filename = filename
+            cfx_filename = change_suffix(filename, '.def')
+            if self.filename.stat().st_mtime < cfx_filename.stat().st_mtime:
+                logger.debug('CCL HDF file exists but out of date. generating new one from the cfx file')
+                _ = CCLTextFile(generate(cfx_filename)).to_hdf(self.filename)
+
         elif filename.suffix == '.ccl':
-            ccltext = CCLTextFile(filename)
-            self.filename = ccltext.to_hdf(change_suffix(filename, '.hdf'))
+            self.filename = CCLTextFile(filename).to_hdf(change_suffix(filename, '.cfx'))
+
+        elif filename.suffix in ('.res', '.def', '.cfx'):
+            self.filename = CCLTextFile(generate(filename)).to_hdf(change_suffix(filename, '.cfx'))
+
         else:
-            ccltext = CCLTextFile(generate(filename))
-            self.filename = ccltext.to_hdf(change_suffix(filename, '.hdf'))
+            raise ValueError(f'Unexpected suffix: {filename.suffix}. Must be .hdf, .ccl, .def or .cfx!')
 
     def __getitem__(self, item):
         with h5py.File(self.filename) as h5:

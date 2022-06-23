@@ -5,13 +5,14 @@ from ._logger import logger, _file_handler, _stream_handler
 
 AUXDIRNAME = '.cfdtoolkit'
 
-
 USER_CONFIG_DIR = pathlib.Path.home() / ".config" / __package__
 
-if platform.system() == 'Windows':
+if 'win' in platform.system().lower():
     CFX_DOTENV_FILENAME = USER_CONFIG_DIR.joinpath('cfx_win.env')
-else:
+elif 'linux' in platform.system().lower():
     CFX_DOTENV_FILENAME = USER_CONFIG_DIR.joinpath('cfx_linux.env')
+else:
+    raise NotImplementedError(f'No support for mac (yet)!')
 SESSIONS_DIR = pathlib.Path(__file__).parent.joinpath('cfx/session_files')
 
 if not SESSIONS_DIR.exists():

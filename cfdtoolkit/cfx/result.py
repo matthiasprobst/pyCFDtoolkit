@@ -2,7 +2,6 @@ import logging
 import os
 import pathlib
 import time
-from dataclasses import dataclass
 from typing import Union, List
 
 import dotenv
@@ -14,6 +13,7 @@ from .core import OutFile, MonitorData
 from .definition import CFXDefFile
 from .utils import touch_stp
 from .. import CFX_DOTENV_FILENAME
+from ..typing import PATHLIKE
 
 dotenv.load_dotenv(CFX_DOTENV_FILENAME)
 
@@ -22,7 +22,7 @@ CFX5SOLVE = os.environ.get("cfx5solve")
 logger = logging.getLogger(__package__)
 
 
-def _predict_new_res_filename(current_filename: Union[str, bytes, os.PathLike]):
+def _predict_new_res_filename(current_filename: PATHLIKE):
     current_filename = pathlib.Path(current_filename)
     if current_filename.suffix in ('.cfx', '.def'):
         list_of_res_files = sorted(list(current_filename.parent.glob(f'{current_filename.stem}*.res')))
@@ -44,11 +44,13 @@ def _predict_new_res_filename(current_filename: Union[str, bytes, os.PathLike]):
     return current_filename.parent.joinpath(f'{name_prefix}_{new_number:03d}.res')
 
 
-@dataclass
 class CFXResFile(CFXFile):
     """Class wrapped around the *.res case file"""
 
-    def_file: CFXDefFile
+    def __init__(self, filename, def_filename):
+        super(CFXResFile, self).__init__(filename)
+        self.case_stem = self.filename.stem.rsplit('_', 1)[0]
+        self.def_filename = def_filename
 
     @property
     def monitor(self):
@@ -72,13 +74,16 @@ class CFXResFile(CFXFile):
         print('Honestly, dont know! Check to be written')  # TODO check if crashed!4
         return True
 
-    def resume(self, nproc: int, timeout: str = None, wait: bool = False) -> str:
+    def resume(self, nproc: int, def_filename: Union[PATHLIKE, None] = None,
+               timeout: str = None, wait: bool = False) -> str:
         """resumes the computation from this result file
 
         Parameters
         ----------
         nproc: int
             Number of processors to use
+        def_filename: Pathlike or None, optional=None
+            Defintion file. If None, the filename will be assumed based on the result filename stem
         timeout: int
             Maximal time in seconds after which run is stopped independent of solver settings
         wait: bool=False
@@ -90,10 +95,17 @@ class CFXResFile(CFXFile):
         cmd: str
             The generated command line string to resume the computation.
         """
-        if self.def_file is None:
-            raise ValueError('Definition file is unknown')
-        cmd = solve.build_cmd(def_filename=self.def_file.filename, nproc=nproc,
-                              ini_filename=self.filename, timeout=timeout)
+
+        # creating an instance of CFXDefFile
+        if def_filename is None:
+            def_filename = f'{self.case_stem}.def'
+            logger.debug(f'Resuming on def file: {def_filename}')
+
+        if def_filename.exists():
+            cmd = solve.build_cmd(def_filename=self.def_filename, nproc=nproc,
+                                  ini_filename=self.filename, timeout=timeout)
+        else:
+            raise FileNotFoundError(f'Could not find definition file: {def_filename}')
         p = call_cmd(cmd, wait)
         return cmd
 
@@ -134,6 +146,12 @@ class CFXResFile(CFXFile):
             return False
         return True
 
+    @property
+    def is_latest(self):
+        """returns whether this CFXFile is the latest in the list."""
+        filenames = sorted(list(self.working_dir.glob(f'{self.case_stem}*.res')))
+        return self.filename == filenames[-1]
+
 
 # @dataclass
 # class FutureCFXResFile:
@@ -144,17 +162,19 @@ class CFXResFile(CFXFile):
 #         current_number = 0
 #         return self.filename.parent.joinpath(f'{str(self.filename.stem)[:-3]}{current_number + 1:03d}.res')
 
-@dataclass
 class CFXResFiles:
-    filenames: List[Union[str, bytes, os.PathLike, pathlib.Path]]
-    def_file: CFXDefFile
-    sort: bool = True
 
-    def __post_init__(self):
+    def __init__(self, filenames: List[PATHLIKE], def_filename: PATHLIKE, sort: bool = True):
+        self.filenames = filenames
+        self.def_filename = def_filename
+        self.sort = sort
+        self.update()
+
+    def update(self):
         if self.sort:
-            self.cfx_res_files = [CFXResFile(filename, self.def_file) for filename in sorted(self.filenames)]
+            self.cfx_res_files = [CFXResFile(filename, self.def_filename) for filename in sorted(self.filenames)]
         else:
-            self.cfx_res_files = [CFXResFile(filename, self.def_file) for filename in self.filenames]
+            self.cfx_res_files = [CFXResFile(filename, self.def_filename) for filename in self.filenames]
 
     def __len__(self):
         return len(self.cfx_res_files)
@@ -164,6 +184,7 @@ class CFXResFiles:
 
     @property
     def latest(self):
+        self.update()
         if len(self) > 0:
             return self[-1]
         else:

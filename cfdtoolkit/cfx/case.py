@@ -3,7 +3,6 @@ import os
 import pathlib
 import shutil
 import time
-from dataclasses import dataclass
 from typing import Union
 
 import dotenv
@@ -14,7 +13,6 @@ from .ccl import CCLFile
 from .cmd import call_cmd
 from .core import AnalysisType
 from .core import CFXFile
-from .definition import CFXDefFile
 from .result import CFXResFile, CFXResFiles, _predict_new_res_filename
 from .utils import change_suffix
 from .utils import touch_stp
@@ -27,15 +25,14 @@ dotenv.load_dotenv(CFX_DOTENV_FILENAME)
 CFX5SOLVE = os.environ.get("cfx5solve")
 
 
-def update_cfx_case(func):
-    def update_cfx_case_wrapper(*args, **kwargs):
-        args[0].update()
-        return func(*args, **kwargs)
+# def update_cfx_case(func):
+#     def update_cfx_case_wrapper(*args, **kwargs):
+#         args[0].update()
+#         return func(*args, **kwargs)
+#
+#     return update_cfx_case_wrapper
 
-    return update_cfx_case_wrapper
 
-
-@dataclass
 class CFXCase(CFXFile):
     """Class wrapped around the *.cfx case file.
 
@@ -46,12 +43,22 @@ class CFXCase(CFXFile):
     The result files (.res) will look like `mycase_001.res` and `maycase_002.res` and so on.
     """
 
+    def __init__(self, filename):
+        """
+        Avoids error when multiple cfx files are available in
+        one folder, e.g. *._frz, *_trn.cfx
+        """
+        super().__init__(filename)
+        if not self.filename.exists():
+            raise FileExistsError(f'CFX file does not exist: {self.filename}')
+        self.update()
+
     @property
     def name(self):
         return self.filename.stem
 
-    @update_cfx_case
     def __repr__(self):
+        self.update()
         _outstr = f"Working dir: {self.filename.parent}"
         if len(self.res_files) == 0:
             _outstr += '\nNo result files yet'
@@ -60,12 +67,11 @@ class CFXCase(CFXFile):
                 _outstr += f"\n\t#{i:3d}: {res_file.filename.name}"
         return _outstr
 
-    @update_cfx_case
     def __str__(self):
-        print(self.__repr__())
+        return self.__repr__()
 
-    @update_cfx_case
     def __getitem__(self, item):
+        self.update()
         return self.res_files[item]
 
     def copy(self, new_name: Union[str, PATHLIKE]):
@@ -127,11 +133,14 @@ class CFXCase(CFXFile):
         if not self.working_dir.exists():
             raise NotADirectoryError('The working directory does not exist. Can only work with existing cases!')
 
-        def_filename_list = change_suffix(self.filename, '.def')
-        self.def_file = CFXDefFile(self.guess_definition_filename())
+        def_filename = change_suffix(self.filename, '.def')
+        if not def_filename.exists():
+            def_filename = session.cfx2def(self.filename)
+            if not def_filename.exists():
+                raise RuntimeError(f'Seems that solver file was not written from {self.filename}')
 
         res_filename_list = list(self.working_dir.glob(f'{self.filename.stem}*.res'))
-        self.res_files = CFXResFiles(res_filename_list, self.def_file)
+        self.res_files = CFXResFiles(filenames=res_filename_list, def_filename=def_filename)
 
         self.ccl = CCLFile(self.filename)
 
@@ -147,25 +156,15 @@ class CFXCase(CFXFile):
         # else:
         #     self.ccl = CCLFile(self.filename)
 
-    def __post_init__(self):
-        """
-        Avoids error when multiple cfx files are available in
-        one folder, e.g. *._frz, *_trn.cfx
-        """
-        super().__post_init__()
-        if not self.filename.exists():
-            raise FileExistsError(f'CFX file does not exist: {self.filename}')
-        self.update()
-
-    @property
-    def timestep(self):
-        """returns the time step of the registered def file thus calls timestep property of CFXDefFile instance"""
-        return self.def_file.timestep
-
-    @timestep.setter
-    def timestep(self, timestep):
-        """returns the time step of the registered def file thus calls timestep property of CFXDefFile instance"""
-        return self.def_file.set_timestep(timestep)
+    # @property
+    # def timestep(self):
+    #     """returns the time step of the registered def file thus calls timestep property of CFXDefFile instance"""
+    #     return self.def_file.timestep
+    #
+    # @timestep.setter
+    # def timestep(self, timestep):
+    #     """returns the time step of the registered def file thus calls timestep property of CFXDefFile instance"""
+    #     return self.def_file.set_timestep(timestep)
 
     @property
     def result_files(self):
@@ -173,23 +172,15 @@ class CFXCase(CFXFile):
         return self.res_files
 
     @property
-    @update_cfx_case
     def latest(self):
-        self.res_files.latest
-
-    @update_cfx_case
-    def is_latest(self):
-        """returns whether this CFXFile is the latest in the list."""
-        return self == self.res_files[-1]
-
-    @property
-    def latest_res_file(self):
-        return self.res_files[-1]
+        """Returns the latest .cfx file"""
+        self.update()
+        return self.res_files.latest
 
     @property
     def analysis_type(self) -> AnalysisType:
         """returns the analysis type"""
-        _target_grp = self.def_file.ccl.root_group.sub_groups['FLOW: Flow Analysis 1'].sub_groups['ANALYSIS TYPE']
+        _target_grp = self.ccl.root_group.sub_groups['FLOW: Flow Analysis 1'].sub_groups['ANALYSIS TYPE']
         if 'Steady State' in _target_grp.get_lines()[0]:
             return AnalysisType.STEADYSTATE
         return AnalysisType.TRANSIENT
@@ -198,7 +189,7 @@ class CFXCase(CFXFile):
         """touches a stp-file in the working directory. Returns True if file was detected, False if not"""
         list_of_dir_names = list(self.working_dir.glob('*.dir'))
         for d in list_of_dir_names:
-            if self.def_file.stem == d.stem[:-4]:
+            if self.filename.stem == d.stem[:-4]:
                 touch_stp(d)
 
         if len(list_of_dir_names) == 0:
@@ -220,18 +211,19 @@ class CFXCase(CFXFile):
               nproc: int, timeout: int = None, wait: bool = False) -> str:
         """starts from a given initial solution of any result file provided or, if None, starts from
         initial flow field"""
+        def_filename = change_suffix(self.filename, '.def')
         if initial_result_file is None:
             # if len(self.res_files) == 0:
-            cmd = solve.build_cmd(def_filename=self.def_file.filename, nproc=nproc,
+            cmd = solve.build_cmd(def_filename=def_filename, nproc=nproc,
                                   ini_filename=None, timeout=timeout)
             call_cmd(cmd, wait=wait)
             return cmd
 
         if isinstance(initial_result_file, CFXResFile):
             _initial_result_file = initial_result_file.filename
-            _init = CFXResFile(filename=_initial_result_file, def_file=self.def_file)
+            _init = CFXResFile(filename=_initial_result_file, def_filename=def_filename)
         else:  # path is given
-            _init = CFXResFile(filename=initial_result_file, def_file=self.def_file)
+            _init = CFXResFile(filename=initial_result_file, def_filename=def_filename)
         return _init.resume(nproc, timeout, wait=wait)
 
     def import_ccl(self, ccl_filename: Union[PATHLIKE, None] = None):
@@ -241,10 +233,7 @@ class CFXCase(CFXFile):
 
     # def _scan_res_files(self):
     #     res_filename_list = list(self.working_dir.glob(f'{self.filename.stem}*.res'))
-    #     self.res_files = CFXResFiles(res_filename_list, self.def_file)
-
-    def guess_definition_filename(self):
-        return self.working_dir.joinpath(f'{self.filename.stem}.def')
+    #     self.res_files = CFXResFiles(res_filename_list, def_filename)
 
     def _predict_new_res_filename(self):
         return _predict_new_res_filename(self.filename)

@@ -1,6 +1,4 @@
-import os
 import pathlib
-from dataclasses import dataclass
 from enum import Enum
 from typing import Union
 
@@ -8,10 +6,12 @@ import dotenv
 import pandas as pd
 import xarray as xr
 from numpy.typing import ArrayLike
-from .. import AUXDIRNAME
+
 from . import mon
 from .out import extract_out_data, mesh_info_from_file
+from .. import AUXDIRNAME
 from .. import CFX_DOTENV_FILENAME
+from ..typing import PATHLIKE
 
 dotenv.load_dotenv(CFX_DOTENV_FILENAME)
 
@@ -21,21 +21,11 @@ class AnalysisType(Enum):
     TRANSIENT = 2
 
 
-@dataclass
 class CFXFile:
     """Base wrapper class around a generic Ansys CFX file"""
-    filename: Union[str, bytes, os.PathLike, pathlib.Path]
 
-    @property
-    def stem(self):
-        return self.filename.stem
-
-    @property
-    def parent(self):
-        return self.filename.parent
-
-    def __post_init__(self):
-        self.filename = pathlib.Path(self.filename).resolve()
+    def __init__(self, filename: PATHLIKE):
+        self.filename = pathlib.Path(filename).resolve()
         self.working_dir = self.filename.parent.resolve()
 
         if self.filename.suffix == '.res':
@@ -50,7 +40,8 @@ class CFXDir(CFXFile):
     """The .dir directory when a case is running"""
 
     @property
-    def is_crasehd(self):
+    def is_crashed(self):
+        raise NotImplementedError()
         return False
 
 
@@ -94,12 +85,11 @@ class MonitorDataFrame(pd.DataFrame):
         return {up.attrs['name']: up for up in user_point_list}
 
 
-@dataclass
 class MonitorData(CFXFile):
-    _data: pd.DataFrame = pd.DataFrame()
 
-    def __post_init__(self):
-        super(MonitorData, self).__post_init__()
+    def __init__(self, filename):
+        super(MonitorData, self).__init__(filename)
+        _data = pd.DataFrame()
         _out_filename = f'{self.filename.stem}.monitor'
         self._out_filename = self.aux_dir.joinpath(_out_filename)
         self._data = pd.DataFrame()
@@ -141,11 +131,10 @@ class MonitorData(CFXFile):
         return self.data.user_points()
 
 
-@dataclass
 class OutFile(MonitorData):
 
-    def __post_init__(self):
-        super().__post_init__()
+    def __init__(self, filename):
+        super().__init__(filename)
         _out_filename = f'{self.filename.stem}.outdata'
         self._out_filename = self.aux_dir.joinpath(_out_filename)
 

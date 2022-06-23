@@ -1,6 +1,5 @@
 import logging
 import pathlib
-from dataclasses import dataclass
 
 from . import ccl
 from . import session
@@ -9,22 +8,25 @@ from .core import CFXFile
 logger = logging.getLogger(__package__)
 
 
-@dataclass
 class CFXDefFile(CFXFile):
     """Class wrapped around the *.def case file"""
 
-    def __post_init__(self):
-        super().__post_init__()
+    def __init__(self, filename):
+        super().__init__(filename)
         if not self.filename.exists():
             logger.info('No .def file exists for the case. Creating one...')
-            self.update()
+            self.filename = session.cfx2def(self.get_cfx_filename(), self.filename)
+
+        # check again
         if not self.filename.exists():
             raise RuntimeError(f'Apparently there is still no definition file. cfx2def must have failed...'
-                               f'Is your license available?')
+                               f'Is your license available? Or the cfx file may be corrupted.')
+
+        # now, the def file exists for sure. but is it up-to-date?
         if self.filename.stat().st_mtime < self.get_cfx_filename().stat().st_mtime:
             logger.info(f'The .def file is out of date ({self.filename.stat().st_mtime} < '
                         f'{self.get_cfx_filename().stat().st_mtime}. Creating a new one...')
-            self.update()
+            self.filename = session.cfx2def(self.get_cfx_filename(), self.filename)
 
     def get_cfx_filename(self):
         """Generates the .cfx filename from the .def filename"""
@@ -53,6 +55,6 @@ class CFXDefFile(CFXFile):
         ccl_hdf_filename = ccltext.to_hdf()
         return ccl.CCLFile(ccl_hdf_filename)
 
-    def update(self):
-        """write .def from .cfx"""
-        self.filename = session.cfx2def(self.get_cfx_filename(), self.filename)
+    # def update(self):
+    #     """write .def from .cfx"""
+    #     self.filename = session.cfx2def(self.get_cfx_filename(), self.filename)

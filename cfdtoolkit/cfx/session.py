@@ -8,7 +8,7 @@ from typing import Union
 import dotenv
 
 from .cmd import call_cmd
-from .utils import change_suffix
+from .utils import change_suffix, ansys_version_from_inst_dir
 from .. import CFX_DOTENV_FILENAME
 from .. import SESSIONS_DIR
 from ..typing import PATHLIKE
@@ -18,9 +18,11 @@ dotenv.load_dotenv(CFX_DOTENV_FILENAME)
 logger = logging.getLogger('cfdtoolkit')
 
 CFX5PRE = pathlib.Path(os.environ.get("cfx5pre"))
+ANSYSVERSION = ansys_version_from_inst_dir(CFX5PRE)
 
 
-def importccl(cfx_filename: PATHLIKE, ccl_filename: Union[PATHLIKE, None] = None) -> pathlib.Path:
+def importccl(cfx_filename: PATHLIKE, ccl_filename: Union[PATHLIKE, None] = None,
+              ansys_version: str = ANSYSVERSION) -> pathlib.Path:
     """imports a .ccl file into a .cfx file"""
     if ccl_filename is None:
         ccl_filename = change_suffix(cfx_filename, '.ccl')
@@ -37,6 +39,7 @@ def importccl(cfx_filename: PATHLIKE, ccl_filename: Union[PATHLIKE, None] = None
     _tmp_session_filename = copy_session_file_to_tmp(_orig_session_filename)
     replace_in_file(_tmp_session_filename, '__cfxfilename__', str(cfx_filename))
     replace_in_file(_tmp_session_filename, '__cclfilename__', str(ccl_filename))
+    replace_in_file(_tmp_session_filename, '__version__', ansys_version)
 
     play_session(_tmp_session_filename)
     # now check if .cfx file modification time has changed
@@ -45,7 +48,8 @@ def importccl(cfx_filename: PATHLIKE, ccl_filename: Union[PATHLIKE, None] = None
     return cfx_filename
 
 
-def cfx2def(cfx_filename: PATHLIKE, def_filename: Union[PATHLIKE, None] = None) -> pathlib.Path:
+def cfx2def(cfx_filename: PATHLIKE, def_filename: Union[PATHLIKE, None] = None,
+            ansys_version: str = ANSYSVERSION) -> pathlib.Path:
     if def_filename is None:
         def_filename = cfx_filename.parent.joinpath(f'{cfx_filename.stem}.def')
 
@@ -53,26 +57,31 @@ def cfx2def(cfx_filename: PATHLIKE, def_filename: Union[PATHLIKE, None] = None) 
     _tmp_session_filename = copy_session_file_to_tmp(_orig_session_filename)
     replace_in_file(_tmp_session_filename, '__cfxfilename__', str(cfx_filename))
     replace_in_file(_tmp_session_filename, '__deffilename__', str(def_filename))
+    replace_in_file(_tmp_session_filename, '__version__', ansys_version)
     play_session(_tmp_session_filename)
     return def_filename
 
 
-def change_timestep_and_write_def(cfx_filename: PATHLIKE, def_filename: PATHLIKE, timestep: float):
+def change_timestep_and_write_def(cfx_filename: PATHLIKE, def_filename: PATHLIKE, timestep: float,
+                                  ansys_version: str = ANSYSVERSION):
     """changes timestep in *.cfx fil and writes solver file *.def"""
     _orig_session_filename = SESSIONS_DIR.joinpath('change_timestep_and_write_def.pre')
     _tmp_session_filename = copy_session_file_to_tmp(_orig_session_filename)
     replace_in_file(_tmp_session_filename, '__cfxfilename__', str(cfx_filename))
     replace_in_file(_tmp_session_filename, '__timestep__', str(timestep))
     replace_in_file(_tmp_session_filename, '__deffilename__', str(def_filename))
+    replace_in_file(_tmp_session_filename, '__version__', ansys_version)
     play_session(_tmp_session_filename)
 
 
-def change_timestep(cfx_filename: PATHLIKE, timestep: float):
+def change_timestep(cfx_filename: PATHLIKE, timestep: float,
+                    ansys_version: str = ANSYSVERSION):
     """changes timestep in *.cfx file. DOES NOT WRITE THE *.DEF FILE!"""
     _orig_session_filename = SESSIONS_DIR.joinpath('change_timestep.pre')
     _tmp_session_filename = copy_session_file_to_tmp(_orig_session_filename)
     replace_in_file(_tmp_session_filename, '__cfxfilename__', str(cfx_filename))
     replace_in_file(_tmp_session_filename, '__timestep__', str(timestep))
+    replace_in_file(_tmp_session_filename, '__version__', ansys_version)
     play_session(_tmp_session_filename)
 
 
