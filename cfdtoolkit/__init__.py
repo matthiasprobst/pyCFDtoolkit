@@ -2,6 +2,7 @@ import pathlib
 import platform
 
 from ._logger import logger, _file_handler, _stream_handler
+from ._version import __version__
 
 AUXDIRNAME = '.cfdtoolkit'
 
