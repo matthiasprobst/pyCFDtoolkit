@@ -525,25 +525,30 @@ class CCLHDFFlowGroup(CCLHDFGroup):
 class CCLFile:
     """Interface class to the HDF file containing CCL data"""
 
-    def __init__(self, filename: PATHLIKE):
+    def __init__(self, filename: PATHLIKE, aux_dir: PATHLIKE = None):
         """
         Note: if the cfx file is younger than the ccl file, the ccl file will be rewritten
         from the cfx file! All data in the existing ccl hdf file will be overwritten.
         """
         # logger.debug('reading ccl')
         filename = pathlib.Path(filename)
-        if filename.suffix == '.hdf':
+        if filename.suffix in ('.hdf', '.cclh5'):
             self.filename = filename
-            cfx_filename = change_suffix(filename, '.cfx')
-            if self.filename.stat().st_mtime < cfx_filename.stat().st_mtime:
-                # logger.debug('CCL HDF file exists but out of date. generating new one from the cfx file')
-                _ = CCLTextFile(generate(cfx_filename)).to_hdf(self.filename)
-
+            self.aux_dir = filename.parent
         elif filename.suffix == '.ccl':
-            self.filename = CCLTextFile(filename).to_hdf(change_suffix(filename, '.hdf'))
+            _hdf_fname = change_suffix(filename, '.cclh5')
+            if aux_dir is not None:
+                self.aux_dir = aux_dir
+                _hdf_fname = _hdf_fname.parent.joinpath(self.aux_dir).joinpath(_hdf_fname.name)
+            self.filename = CCLTextFile(filename).to_hdf(_hdf_fname)
 
         elif filename.suffix in ('.res', '.def', '.cfx'):
-            self.filename = CCLTextFile(generate(filename)).to_hdf(change_suffix(filename, '.hdf'))
+            _ccl_fname = change_suffix(filename, '.ccl')
+            if aux_dir is not None:
+                self.aux_dir = aux_dir
+                _ccl_fname = _ccl_fname.parent.joinpath(self.aux_dir).joinpath(_ccl_fname.name)
+            _hdf_fname = change_suffix(_ccl_fname, '.cclh5')
+            self.filename = CCLTextFile(generate(filename, ccl_filename=_ccl_fname)).to_hdf(_hdf_fname)
 
         else:
             raise ValueError(f'Unexpected suffix: {filename.suffix}. Must be .hdf, .ccl, .def or .cfx!')

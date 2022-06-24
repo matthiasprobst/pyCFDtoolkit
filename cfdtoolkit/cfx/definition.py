@@ -53,7 +53,7 @@ class CFXDefFile(CFXFile):
 
         ccltext = ccl.CCLTextFile(ccl_filename)
         ccl_hdf_filename = ccltext.to_hdf()
-        return ccl.CCLFile(ccl_hdf_filename)
+        return ccl.CCLFile(ccl_hdf_filename, self.aux_dir)
 
     # def update(self):
     #     """write .def from .cfx"""

@@ -147,7 +147,7 @@ class CFXCase(CFXFile):
         res_filename_list = list(self.working_dir.glob(f'{self.filename.stem}*.res'))
         self.res_files = CFXResFiles(filenames=res_filename_list, def_filename=def_filename)
 
-        self.ccl = CCLFile(self.filename)
+        self.ccl = CCLFile(self.filename, aux_dir=self.aux_dir)
 
         # # generate the .ccl file from the .def file if exists and younger than .cfx file
         # # otherwise built from .cfx file

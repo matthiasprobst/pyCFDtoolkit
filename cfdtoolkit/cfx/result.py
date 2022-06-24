@@ -10,7 +10,6 @@ from . import solve
 from .cmd import call_cmd
 from .core import CFXFile
 from .core import OutFile, MonitorData
-from .definition import CFXDefFile
 from .utils import touch_stp
 from .. import CFX_DOTENV_FILENAME
 from ..typing import PATHLIKE
@@ -95,10 +94,8 @@ class CFXResFile(CFXFile):
         cmd: str
             The generated command line string to resume the computation.
         """
-
-        # creating an instance of CFXDefFile
         if def_filename is None:
-            def_filename = self.def_filename# pathlib.Path(f'{self.case_stem}.def')
+            def_filename = self.def_filename
             logger.debug(f'Resuming on def file: {def_filename}')
 
         if def_filename.exists():
