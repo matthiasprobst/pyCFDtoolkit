@@ -233,6 +233,7 @@ class CFXCase(CFXFile):
 
     def import_ccl(self, ccl_filename: Union[PATHLIKE, None] = None):
         """Imports a .ccl file into a .cfx file and saves the .cfx file"""
+        ccl_filename = self.ccl.to_ccl(change_suffix(self.ccl.filename, '.ccl'))
         _ = session.importccl(self.filename, ccl_filename)
         self.update()
 

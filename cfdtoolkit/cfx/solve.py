@@ -24,5 +24,5 @@ def build_cmd(def_filename, nproc, ini_filename, timeout):
     if timeout is not None:
         if timeout <= 0:
             raise ValueError(f'Invalid value for timeout: {timeout}')
-        cmd += f' -maxet "{int(timeout)} [s]"'  # e.g. maxet='10 [min]'
+        cmd += f' -maxet \"{int(timeout)} [s]\"'  # e.g. maxet='10 [min]'
     return cmd

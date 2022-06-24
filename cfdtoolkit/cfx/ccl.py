@@ -198,12 +198,14 @@ def hdf_to_ccl(hdf_filename: PATHLIKE, ccl_filename: Union[PATHLIKE, None] = Non
         _spaces = ''.join([' '] * nlevel * intendation_step)
         name_stem = pathlib.Path(h5obj.name).stem
         if ':' in name_stem:
-            ret_string += f'{_spaces}{name_stem.upper()}\n'
+            # ret_string += f'{_spaces}{name_stem.upper()}\n'
+            ret_string += f'{_spaces}{name_stem}\n'
         else:
             ret_string += f'{_spaces}{name_stem.upper()}:\n'
 
         for _k, _v in h5obj.attrs.items():
-            ret_string += _spaces.join([' '] * intendation_step) + f' {_k.capitalize()} = {capitalize_phrase(_v)}\n'
+            ret_string += _spaces.join([' '] * intendation_step) + f'{capitalize_phrase(_k)} = {capitalize_phrase(_v)}\n'
+            # ret_string += _spaces.join([' '] * intendation_step) + f'{_k} = {_v}\n'
 
         writer.write(ret_string)
 
@@ -279,7 +281,7 @@ class CCLTextFile:
                             single_lines[-1] += _line[:-1]
                         else:
                             append_line = False
-                            single_lines[-1] += _line
+                            single_lines[-1] += _line.strip()
                     else:
                         if _line[-1] == '\\':
                             if append_line:
@@ -579,10 +581,10 @@ class CCLFile:
         """Returns a list of groups starting wiht 'FLOW: '"""
         return _list_of_instances_by_keyword_substring(self.filename, '/', 'FLOW: ', CCLHDFFlowGroup)
 
-    def to_ccl(self, ccl_filename: Union[PATHLIKE, None]):
+    def to_ccl(self, ccl_filename: Union[PATHLIKE, None]) -> pathlib.Path:
         if ccl_filename is None:
-            ccl_filename = change_suffix(self.filename)
-        hdf_to_ccl(self.filename, ccl_filename, intendation_step=INTENDATION_STEP)
+            ccl_filename = change_suffix(self.filename, '.ccl')
+        return hdf_to_ccl(self.filename, ccl_filename, intendation_step=INTENDATION_STEP)
 
 
 def generate(input_file: PATHLIKE, ccl_filename: Union[PATHLIKE, None] = None,
