@@ -13,11 +13,11 @@ Clone the repo and install it using `pip`
     pip install (-e) pyCFDtoolbox
 ```
 Toolbox mainly to post-process CFD results. At the current development stage, it mainly provides tools to controll
-ANSYS-CFX simulations.
+ANSYS-cfx simulations.
 
 ## Modules
-### Ansys CFX control
-Allows you to control and manipulate ANSYS-CFX cases. You can manage them 
+### ANSYS-cfx control
+Allows you to control and manipulate ANSYS-cfx cases. You can manage them 
 and create queues which may include some conditional code, e.g. check convergence of 
 a steady state case before starting a transient one. This is made easy as you can access and 
 control Ansys (data) via python. All you need is an instance of the class `CFXCase`.
@@ -26,6 +26,8 @@ control Ansys (data) via python. All you need is an instance of the class `CFXCa
 
 ### v0.2.0
   - Package got renamed from `cfdtoolbox` to `cfdtoolkit`
+  - bugfixes
+  - class `DefFile` no longer needed. def filename is built from the case filename
 ### v0.1.0-rc
   - Ansys-CFX module (`cfx`) exists with limited functionality (notebook example code exists):
     - starting, resuming and stoping cases.
