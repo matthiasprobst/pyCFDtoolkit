@@ -58,7 +58,7 @@ def cfx2def(cfx_filename: PATHLIKE, def_filename: Union[PATHLIKE, None] = None,
     replace_in_file(_tmp_session_filename, '__cfxfilename__', str(cfx_filename))
     replace_in_file(_tmp_session_filename, '__deffilename__', str(def_filename))
     replace_in_file(_tmp_session_filename, '__version__', ansys_version)
-    play_session(_tmp_session_filename)
+    play_session(_tmp_session_filename, wait=True)
     return def_filename
 
 
@@ -137,7 +137,8 @@ def replace_in_file(filename, keyword, new_string):
 
 
 def play_session(session_file: PATHLIKE,
-                 cfx5pre: Union[PATHLIKE, None] = None) -> None:
+                 cfx5pre: Union[PATHLIKE, None] = None,
+                 wait: bool=True) -> None:
     """
     Runs cfx5pre session file
 
@@ -158,5 +159,5 @@ def play_session(session_file: PATHLIKE,
     session_file = pathlib.Path(session_file)
 
     cmd = f'"{_cfx5path}" -batch "{session_file}"'
-    call_cmd(cmd)
+    call_cmd(cmd, wait=wait)
     return cmd

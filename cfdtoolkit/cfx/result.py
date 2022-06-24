@@ -75,7 +75,7 @@ class CFXResFile(CFXFile):
         return True
 
     def resume(self, nproc: int, def_filename: Union[PATHLIKE, None] = None,
-               timeout: str = None, wait: bool = False) -> str:
+               timeout: str = None, wait: bool = True) -> str:
         """resumes the computation from this result file
 
         Parameters

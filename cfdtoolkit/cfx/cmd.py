@@ -20,7 +20,7 @@ def call_cmd(cmd, wait=True):
                                      stdout=subprocess.PIPE,
                                      universal_newlines=True)
         except RuntimeError as e:
-            raise f'Exception raised for command line string: "{cmd_split}": {e}'
+            raise RuntimeError(f'Exception raised for command line string: "{cmd_split}": {e}')
     else:
         # TODO: the following should be solved properly:
         cmd += ' &'

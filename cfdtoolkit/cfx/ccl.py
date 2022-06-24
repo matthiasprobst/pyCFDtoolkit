@@ -540,10 +540,10 @@ class CCLFile:
                 _ = CCLTextFile(generate(cfx_filename)).to_hdf(self.filename)
 
         elif filename.suffix == '.ccl':
-            self.filename = CCLTextFile(filename).to_hdf(change_suffix(filename, '.cfx'))
+            self.filename = CCLTextFile(filename).to_hdf(change_suffix(filename, '.hdf'))
 
         elif filename.suffix in ('.res', '.def', '.cfx'):
-            self.filename = CCLTextFile(generate(filename)).to_hdf(change_suffix(filename, '.cfx'))
+            self.filename = CCLTextFile(generate(filename)).to_hdf(change_suffix(filename, '.hdf'))
 
         else:
             raise ValueError(f'Unexpected suffix: {filename.suffix}. Must be .hdf, .ccl, .def or .cfx!')
