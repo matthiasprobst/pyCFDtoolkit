@@ -45,6 +45,16 @@ class CFXDir(CFXFile):
         return False
 
 
+class MonitorObject:
+
+    def __init__(self, expression_value: str, coord_frame: str = 'Coord 0'):
+        """
+        TODO: expression and coord frame could also be objects
+        """
+        self.coord_frame = coord_frame
+        self.expression_value = expression_value
+
+
 class MonitorUserPoint(xr.DataArray):
     __slots__ = ()
 

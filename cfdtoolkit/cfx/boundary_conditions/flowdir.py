@@ -5,7 +5,9 @@ from .axis import AxisDefinition
 
 @dataclass
 class FlowDirection:
-    pass
+
+    def __str__(self):
+        return self.option
 
 
 @dataclass

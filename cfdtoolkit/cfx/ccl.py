@@ -14,8 +14,9 @@ from h5wrapperpy._html.html_repr import h5file_html_repr
 from . import session
 from .boundary_conditions import CFXBoundaryCondition
 from .cmd import call_cmd
+from .core import MonitorObject
 from .session import cfx2def
-from .utils import change_suffix, capitalize_phrase
+from .utils import change_suffix
 from .. import CFX_DOTENV_FILENAME, SESSIONS_DIR
 from ..typing import PATHLIKE
 
@@ -204,8 +205,8 @@ def hdf_to_ccl(hdf_filename: PATHLIKE, ccl_filename: Union[PATHLIKE, None] = Non
             ret_string += f'{_spaces}{name_stem.upper()}:\n'
 
         for _k, _v in h5obj.attrs.items():
-            ret_string += _spaces.join([' '] * intendation_step) + f'{capitalize_phrase(_k)} = {capitalize_phrase(_v)}\n'
-            # ret_string += _spaces.join([' '] * intendation_step) + f'{_k} = {_v}\n'
+            # ret_string += _spaces.join([' '] * intendation_step) + f'{capitalize_phrase(_k)} = {capitalize_phrase(_v)}\n'
+            ret_string += _spaces.join([' '] * intendation_step) + f'{_k} = {_v}\n'
 
         writer.write(ret_string)
 
@@ -321,16 +322,27 @@ class CCLHDFAttributWrapper:
     path: PATHLIKE
     values: dict
 
-    def __setitem__(self, key, value):
-        _ = self.values[key]  # let python raise the error if key not in self.values
+    def __delitem__(self, key):
         with h5py.File(self.filename, 'r+') as h5:
+            if key in h5[self.path].attrs:
+                del h5[self.path].attrs[key]
+            else:
+                logger.info(f'Note, that the requested key {key} does not exist and thus could not be deleted.')
+
+    def __setitem__(self, key, value):
+        with h5py.File(self.filename, 'r+') as h5:
+            # if key not in h5[self.path].attrs.keys():
             h5[self.path].attrs[key] = value
+        # with h5py.File(self.filename, 'r+') as h5:
+        # _ = self.values[key]  # let python raise the error if key not in self.values
+        # with h5py.File(self.filename, 'r+') as h5:
+        #     h5[self.path].attrs[key] = value
 
     def __getitem__(self, item):
         return self.values[item]
 
     def __repr__(self):
-        return str(self.values)
+        return self.values.__repr__()
 
 
 class CCLHDFGroup:
@@ -343,7 +355,7 @@ class CCLHDFGroup:
     def options(self):
         with h5py.File(self.filename) as h5:
             attr_dict = dict(h5[self.path].attrs.items())
-        return CCLHDFAttributWrapper(self.filename, self.path, attr_dict)
+            return CCLHDFAttributWrapper(self.filename, self.path, attr_dict)
 
     def __repr__(self):
         return f'CCLHDFGroup {self.path} of file {self.filename}'
@@ -436,6 +448,36 @@ class CCLHDFBoundary(CCLHDFGroup):
         bdry.write(self.filename, self.path)
 
 
+class CCLHDFMonitorObject(CCLHDFGroup):
+
+    def __setitem__(self, key, value: Union[dict, MonitorObject]):
+        if any(not c.isalnum() for c in key):
+            # from: https://stackoverflow.com/questions/57062794/how-to-check-if-a-string-has-any-special-characters
+            raise ValueError(f'CCL Expression does not allow special characters!')
+
+        if not isinstance(value, (dict, MonitorObject)):
+            raise TypeError(f'Value must be of type dict or MonitorObject and not {type(value)}')
+        if isinstance(value, dict):
+            value = MonitorObject(**value)
+
+        mp_name = f'MONITOR POINT: {key}'
+        with h5py.File(self.filename, 'r+') as h5:
+            if mp_name not in h5[self.path]:
+                h5[self.path].create_group(mp_name)
+            h5[self.path][mp_name].attrs['Option'] = 'Expression'
+            h5[self.path][mp_name].attrs['Expression Value'] = value.expression_value
+            h5[self.path][mp_name].attrs['Coord Frame'] = value.coord_frame
+
+    def __delitem__(self, monitor_object_name: str):
+        mp_name = f'MONITOR POINT: {monitor_object_name}'
+        with h5py.File(self.filename, 'r+') as h5:
+            if mp_name in h5[self.path]:
+                del h5[self.path][mp_name]
+            else:
+                logger.info(f'Note, that the requested key {monitor_object_name} does not exist and thus could '
+                            'not be deleted.')
+
+
 class CCLHDFDomainGroup(CCLHDFGroup):
 
     @property
@@ -516,6 +558,142 @@ class CCLHDFFlowGroup(CCLHDFGroup):
             return found[0]
         return found
 
+    @property
+    def monitor_object(self):
+        return CCLHDFMonitorObject(self.path + '/OUTPUT CONTROL/MONITOR OBJECTS', self.filename)
+
+    @property
+    def min_iterations(self):
+        with h5py.File(self.filename, 'r') as h5:
+            if 'Minimum Number of Iterations' in h5[self.path]['SOLVER CONTROL/CONVERGENCE CONTROL']:
+                return int(h5[self.path]['SOLVER CONTROL/CONVERGENCE CONTROL'].attrs['Minimum Number of Iterations'])
+            else:
+                return h5[self.path]['SOLVER CONTROL/CONVERGENCE CONTROL'].attrs['Minimum Number of Coefficient Loops']
+
+    @min_iterations.setter
+    def max_iterations(self, min_iter):
+        """Sets the maximum iterations for steady state or the max iterations per time step of a transient run"""
+        with h5py.File(self.filename, 'r+') as h5:
+            if 'Minimum Number of Iterations' in h5[self.path]['SOLVER CONTROL/CONVERGENCE CONTROL']:
+                h5[self.path]['SOLVER CONTROL/CONVERGENCE CONTROL'].attrs['Minimum Number of Iterations'] = int(
+                    min_iter)
+            else:
+                h5[self.path]['SOLVER CONTROL/CONVERGENCE CONTROL'].attrs['Minimum Number of Coefficient Loops'] = int(
+                    min_iter)
+
+    @property
+    def max_iterations(self):
+        with h5py.File(self.filename, 'r') as h5:
+            if 'Minimum Number of Iterations' in h5[self.path]['SOLVER CONTROL/CONVERGENCE CONTROL']:
+                return int(h5[self.path]['SOLVER CONTROL/CONVERGENCE CONTROL'].attrs['Maximum Number of Iterations'])
+            else:
+                return h5[self.path]['SOLVER CONTROL/CONVERGENCE CONTROL'].attrs['Maximum Number of Coefficient Loops']
+
+    @max_iterations.setter
+    def max_iterations(self, max_iter):
+        with h5py.File(self.filename, 'r+') as h5:
+            if 'Maximum Number of Iterations' in h5[self.path]['SOLVER CONTROL/CONVERGENCE CONTROL']:
+                h5[self.path]['SOLVER CONTROL/CONVERGENCE CONTROL'].attrs['Maximum Number of Iterations'] = int(
+                    max_iter)
+            else:
+                h5[self.path]['SOLVER CONTROL/CONVERGENCE CONTROL'].attrs['Maximum Number of Coefficient Loops'] = int(
+                    max_iter)
+
+    @property
+    def time_steps(self):
+        with h5py.File(self.filename, 'r') as h5:
+            if 'TIME STEPS' in h5[self.path]['ANALYSIS TYPE']:
+                return int(h5[self.path]['ANALYSIS TYPE/TIME STEPS'].attrs['Timesteps'].split(' [')[0])
+            else:
+                raise AttributeError(f'This is a steady state run!')
+
+    @time_steps.setter
+    def time_steps(self, time_step):
+        """time step in seconds"""
+        with h5py.File(self.filename, 'r+') as h5:
+            if 'TIME STEPS' in h5[self.path]['ANALYSIS TYPE']:
+                h5[self.path]['ANALYSIS TYPE/TIME STEPS'].attrs['Timesteps'] = f'{int(time_step)} [s]'
+            else:
+                raise AttributeError(f'This is a steady state run!')
+
+    @property
+    def total_time(self):
+        with h5py.File(self.filename, 'r') as h5:
+            if 'TIME DURATION' in h5[self.path]['ANALYSIS TYPE']:
+                return int(h5[self.path]['ANALYSIS TYPE/TIME DURATION'].attrs['Total Time'].split(' [')[0])
+            else:
+                raise AttributeError(f'This is a steady state run!')
+
+    @total_time.setter
+    def total_time(self, time_step):
+        """time step in seconds"""
+        with h5py.File(self.filename, 'r+') as h5:
+            if 'TIME DURATION' in h5[self.path]['ANALYSIS TYPE']:
+                h5[self.path]['ANALYSIS TYPE/TIME DURATION'].attrs['Total Time'] = f'{int(time_step)} [s]'
+                h5[self.path]['ANALYSIS TYPE/TIME DURATION'].attrs['Option'] = 'Total Time'
+            else:
+                raise AttributeError(f'This is a steady state run!')
+
+    @property
+    def max_number_of_timesteps(self):
+        with h5py.File(self.filename, 'r') as h5:
+            if 'TIME DURATION' in h5[self.path]['ANALYSIS TYPE']:
+                return int(h5[self.path]['ANALYSIS TYPE/TIME DURATION'].attrs['Maximum Number of Timesteps'])
+            else:
+                raise AttributeError(f'This is a steady state run!')
+
+    @total_time.setter
+    def max_number_of_timesteps(self, time_step):
+        """max number of timesteps"""
+        with h5py.File(self.filename, 'r+') as h5:
+            if 'TIME DURATION' in h5[self.path]['ANALYSIS TYPE']:
+                h5[self.path]['ANALYSIS TYPE/TIME DURATION'].attrs['Maximum Number of Timesteps'] = f'{int(time_step)}'
+                h5[self.path]['ANALYSIS TYPE/TIME DURATION'].attrs['Option'] = 'Maximum Number of Timesteps'
+            else:
+                raise AttributeError(f'This is a steady state run!')
+
+    @property
+    def time_duration(self):
+        with h5py.File(self.filename, 'r') as h5:
+            if 'TIME DURATION' in h5[self.path]['ANALYSIS TYPE']:
+                return int(h5[self.path]['ANALYSIS TYPE/TIME DURATION'].attrs['Total Time'].split(' [')[0])
+            else:
+                raise AttributeError(f'This is a steady state run!')
+
+    @total_time.setter
+    def time_duration(self, time: Union[dict, list, tuple]):
+        if not isinstance(time, (dict, list, tuple)):
+            raise TypeError('Time information to stop the simulation must be a dictionary, a tuple or a list,'
+                            f' not {type(time)}')
+        if isinstance(time, dict):
+            opt = list(time.keys())[0]
+            value = list(time.values())[0]
+        else:
+            opt, value = time
+        if opt.lower() in ('total time', 'totaltime', 'total_time'):
+            self.total_time = value
+        elif opt.lower() in ('max_number_of_timesteps', 'max_timesteps', 'max timesteps'):
+            self.max_number_of_timesteps = value
+        else:
+            raise NotImplementedError(f'The option "{opt}" is not implemented yet')
+
+    @property
+    def initial_time(self):
+        with h5py.File(self.filename, 'r') as h5:
+            if 'TIME DURATION' in h5[self.path]['ANALYSIS TYPE']:
+                return int(h5[self.path]['ANALYSIS TYPE/INITIAL TIME'].attrs['Time'].split(' [')[0])
+            else:
+                raise AttributeError(f'This is a steady state run!')
+
+    @initial_time.setter
+    def initial_time(self, time_step):
+        """time step in seconds"""
+        with h5py.File(self.filename, 'r+') as h5:
+            if 'TIME DURATION' in h5[self.path]['ANALYSIS TYPE']:
+                h5[self.path]['ANALYSIS TYPE/INITIAL TIME'].attrs['Time'] = f'{int(time_step)} [s]'
+            else:
+                raise AttributeError(f'This is a steady state run!')
+
     # @property
     # def solver_control(self):
     #     return CCLHDFSolverControlGroup(self.path, self.filename)
@@ -580,6 +758,16 @@ class CCLFile:
     def flow(self) -> List[CCLHDFFlowGroup]:
         """Returns a list of groups starting wiht 'FLOW: '"""
         return _list_of_instances_by_keyword_substring(self.filename, '/', 'FLOW: ', CCLHDFFlowGroup)
+
+    @property
+    def library(self) -> CCLHDFGroup:
+        """Returns a the group 'LIBRARY/'"""
+        return CCLHDFGroup('LIBRARY/', self.filename)
+
+    @property
+    def expressions(self) -> CCLHDFGroup:
+        """Returns a the group 'LIBRARY/CEL/EXPRESSIONS'"""
+        return CCLHDFGroup('LIBRARY/CEL/EXPRESSIONS', self.filename)
 
     def to_ccl(self, ccl_filename: Union[PATHLIKE, None]) -> pathlib.Path:
         if ccl_filename is None:

@@ -51,6 +51,11 @@ class CFXResFile(CFXFile):
         self.case_stem = self.filename.stem.rsplit('_', 1)[0]
         self.def_filename = def_filename
 
+    def __repr__(self):
+        if self.is_latest:
+            return f'CFX Result file: {self.filename.name} (latest result file)'
+        return f'CFX Result file: {self.filename.name}'
+
     @property
     def monitor(self):
         return MonitorData(self.filename)
@@ -81,8 +86,8 @@ class CFXResFile(CFXFile):
         ----------
         nproc: int
             Number of processors to use
-        def_filename: Pathlike or None, optional=None
-            Defintion file. If None, the filename will be assumed based on the result filename stem
+        def_filename: PATHLIKE or None, optional=None
+            Definition file. If None, the filename will be assumed based on the result filename stem
         timeout: int
             Maximal time in seconds after which run is stopped independent of solver settings
         wait: bool=False

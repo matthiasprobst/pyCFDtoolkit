@@ -22,7 +22,7 @@ class InletBoundaryCondition(CFXBoundaryCondition):
         with h5py.File(hdf_filename, 'r+') as h5:
             h5[bdry_h5_path].attrs['BOUNDARY TYPE'] = self.boundary_type
 
-            print(f'deleteing {bdry_h5_path}/BOUNDARY CONDITIONS')
+            print(f'deleting {bdry_h5_path}/BOUNDARY CONDITIONS')
             del h5[f'{bdry_h5_path}/BOUNDARY CONDITIONS']
 
             bdry_cond_grp = h5[bdry_h5_path].create_group('BOUNDARY CONDITIONS')
@@ -33,6 +33,7 @@ class InletBoundaryCondition(CFXBoundaryCondition):
                     if isinstance(v, dict):
                         subgrp = _grp.create_group(k)
                         print(f'creating group {subgrp.name}')
+                        print(str(v))
                         _write_group(subgrp, v)
                     else:
                         _grp.attrs[k] = v
@@ -60,17 +61,17 @@ class MassFlowInlet(InletBoundaryCondition):
             raise ValueError(f'Mass flow rate area must be one of those two: '
                              f'"As Specified", "Total for All Sectors"')
         self.content_dict = {'FLOW REGIME': {'Option': self.flow_regime.capitalize()},
-                             'MASS AND MOMENTUM': {'Mass Flow rate': f'{self.normal_speed} [kg s^-1]',
+                             'MASS AND MOMENTUM': {'Mass Flow rate': f'{self.mass_flow_rate} [kg s^-1]',
                                                    'Mass Flow rate Area': self.mass_flow_rate_area},
-                             'FLOW DIRECTION': {'Option': self.flow_direction}
+                             'FLOW DIRECTION': {'Option': self.flow_direction.option}
                              }
         if isinstance(self.flow_direction, flowdir.NormalToBoundary):
             pass
-        elif isinstance(self.flow_direction, axis.CartesianComponents):
+        elif isinstance(self.flow_direction, flowdir.CartesianComponents):
             self.content_dict['FLOW DIRECTION'] = {'X Componen': self.flow_direction.xcomp,
                                                    'Y Componen': self.flow_direction.ycomp,
                                                    'Z Componen': self.flow_direction.zcomp}
-        elif isinstance(self.flow_direction, axis.CylindricalComponents):
+        elif isinstance(self.flow_direction, flowdir.CylindricalComponents):
             self.content_dict['FLOW DIRECTION'] = {'Axial Component': self.flow_direction.axial_comp,
                                                    'Radial Component': self.flow_direction.radial_comp,
                                                    'Theta Component': self.flow_direction.theta_comp,

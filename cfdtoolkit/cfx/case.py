@@ -216,6 +216,7 @@ class CFXCase(CFXFile):
               nproc: int, timeout: int = None, wait: bool = False) -> str:
         """starts from a given initial solution of any result file provided or, if None, starts from
         initial flow field"""
+        self.update_from_ccl()
         def_filename = change_suffix(self.filename, '.def')
         if initial_result_file is None:
             # if len(self.res_files) == 0:
@@ -231,7 +232,15 @@ class CFXCase(CFXFile):
             _init = CFXResFile(filename=initial_result_file, def_filename=def_filename)
         return _init.resume(nproc, timeout, wait=wait)
 
-    def import_ccl(self, ccl_filename: Union[PATHLIKE, None] = None):
+
+    def resume(self, *args, **kwargs):
+        """updates cfx file and def file from ccl file and resumes on latest"""
+        logger.info(f'Updateing cfx from ccl file')
+        self.update_from_ccl()
+        session.cfx2def(self.filename)
+        self.latest.resume(*args, **kwargs)
+
+    def update_from_ccl(self):
         """Imports a .ccl file into a .cfx file and saves the .cfx file"""
         ccl_filename = self.ccl.to_ccl(change_suffix(self.ccl.filename, '.ccl'))
         _ = session.importccl(self.filename, ccl_filename)
@@ -260,6 +269,16 @@ class CFXCase(CFXFile):
             _ = [shutil.rmtree(f) for f in _list_of_files]
             _list_of_files = self.aux_dir.glob(f'{self.filename.stem}*.monitor')
             _ = [f.unlink() for f in _list_of_files]
+
+    # @property
+    # def expression(self):
+    #     return "expression"
+    #
+    # @expression.setter
+    # def expression(self, expr_dict: dict):
+    #     if not isinstance(expr_dict, dict):
+    #         raise TypeError(f'Expression value must type dict not {type(expr_dict)}')
+    #     expr = self.ccl.expressions
 
 #
 # class SteadyStateCFX(CFXCase):
