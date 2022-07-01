@@ -131,7 +131,7 @@ dmypy.json
 .idea
 
 
-+.cfx
+*.cfx
 *.bak
 *.def
 *.res
