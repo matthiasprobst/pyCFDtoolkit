@@ -1,10 +1,14 @@
 # pyCFDtoolkit
 
 A toolkit mainly to post-process CFD results. At the current development stage,
-it mainly provides tools to controll ANSYS-CFX simulations.
+it mainly provides tools to control ANSYS-CFX simulations.
 
-**Note**, that this repository is very alpha (!) and under heavy current development. Please 
+
+## Note
+This repository is very alpha (!) and under heavy current development. Please 
 help me by contributing code and writing issues.
+It is developed under LINUX. It should run under windows but is currently not checked. Once a stable version for linux 
+exists, windows will be supported, too.
 
 ## Installation
 Clone the repo and install it using `pip`
@@ -30,7 +34,7 @@ control Ansys (data) via python. All you need is an instance of the class `CFXCa
   - class `DefFile` no longer needed. def filename is built from the case filename
 ### v0.1.0-rc
   - Ansys-CFX module (`cfx`) exists with limited functionality (notebook example code exists):
-    - starting, resuming and stoping cases.
+    - starting, resuming and stopping cases.
     - changing single parameters in the CCL file
     - changing a full inlet and outlet condition
     - changing the timestep of a transient case
