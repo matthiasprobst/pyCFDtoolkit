@@ -28,6 +28,8 @@ control Ansys (data) via python. All you need is an instance of the class `CFXCa
 
 ## Versions
 
+### v0.2.1
+  - added requirements
 ### v0.2.0
   - Package got renamed from `cfdtoolbox` to `cfdtoolkit`
   - bugfixes
@@ -39,3 +41,9 @@ control Ansys (data) via python. All you need is an instance of the class `CFXCa
     - changing a full inlet and outlet condition
     - changing the timestep of a transient case
     - changing the number of max iterations per run
+    
+---
+ 
+## Troubleshooting
+1. <ins>Cannot install netCDF4</ins><br>Installation in anaconda environment (known issue under windows, anaconda 
+version 4.12.0): Installation of netCDF4 may fail. Manually install it via conda install -c `conda-forge netcdf4`

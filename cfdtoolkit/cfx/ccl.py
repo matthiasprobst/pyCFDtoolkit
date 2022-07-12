@@ -9,7 +9,7 @@ import dotenv
 import h5py
 import numpy as np
 from IPython.display import display, HTML
-from h5wrapperpy._html.html_repr import h5file_html_repr
+from .._html import h5file_html_repr
 
 from . import session
 from .boundary_conditions import CFXBoundaryCondition
