@@ -1,5 +1,6 @@
 import pathlib
 from enum import Enum
+from typing import Dict
 from typing import Union
 
 import dotenv
@@ -65,6 +66,7 @@ class MonitorUserExpression(xr.DataArray):
 
 def _str_to_UserPoint(input_str: str, data: ArrayLike) -> Union[MonitorUserPoint, MonitorUserExpression]:
     """extracts info from a user point string and returns a MonitorUserPoint class"""
+
     _split = input_str.split(',')
     if len(_split) == 2:
         name, _units = _split[1].split(' [')
@@ -86,13 +88,15 @@ def _str_to_UserPoint(input_str: str, data: ArrayLike) -> Union[MonitorUserPoint
                                 attrs=dict(name=name, domain=domain, long_name=variable_name,
                                            ),
                                 coords={'x': x, 'y': y, 'z': z})
+    print(f'Unable to process {input_str}')
 
 
 class MonitorDataFrame(pd.DataFrame):
 
-    def user_points(self):
+    @property
+    def user_points(self) -> Dict:
         user_point_list = [_str_to_UserPoint(n, self[n]) for n in self.columns if n.find('USER POINT') == 0]
-        return {up.attrs['name']: up for up in user_point_list}
+        return {up.attrs['name']: up for up in user_point_list if up is not None}
 
 
 class MonitorData(CFXFile):
@@ -138,7 +142,7 @@ class MonitorData(CFXFile):
 
     @property
     def user_points(self):
-        return self.data.user_points()
+        return self.data.user_points
 
 
 class OutFile(MonitorData):
