@@ -55,6 +55,7 @@ class CFXCase(CFXFile):
 
     @property
     def name(self):
+        """Filename stem"""
         return self.filename.stem
 
     def __repr__(self):
@@ -142,7 +143,7 @@ class CFXCase(CFXFile):
         if not def_filename.exists():
             def_filename = session.cfx2def(self.filename)
             if not def_filename.exists():
-                raise RuntimeError(f'Seems that solver file was not written from {self.filename}')
+                raise RuntimeError(f'Seems that the solver file was not written from {self.filename}')
 
         res_filename_list = list(self.working_dir.glob(f'{self.filename.stem}*.res'))
         self.res_files = CFXResFiles(filenames=res_filename_list, def_filename=def_filename)
@@ -222,7 +223,7 @@ class CFXCase(CFXFile):
             # if len(self.res_files) == 0:
             cmd = solve.build_cmd(def_filename=def_filename, nproc=nproc,
                                   ini_filename=None, timeout=timeout)
-            call_cmd(cmd, wait=wait)
+            call_cmd(cmd)
             return cmd
 
         if isinstance(initial_result_file, CFXResFile):
@@ -231,7 +232,6 @@ class CFXCase(CFXFile):
         else:  # path is given
             _init = CFXResFile(filename=initial_result_file, def_filename=def_filename)
         return _init.resume(nproc, timeout, wait=wait)
-
 
     def resume(self, *args, **kwargs):
         """updates cfx file and def file from ccl file and resumes on latest"""

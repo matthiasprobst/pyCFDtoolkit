@@ -1,11 +1,10 @@
+import dotenv
 import logging
 import os
 import pathlib
 import shutil
 import tempfile
 from typing import Union
-
-import dotenv
 
 from .cmd import call_cmd
 from .utils import change_suffix, ansys_version_from_inst_dir
@@ -50,15 +49,21 @@ def importccl(cfx_filename: PATHLIKE, ccl_filename: Union[PATHLIKE, None] = None
 
 def cfx2def(cfx_filename: PATHLIKE, def_filename: Union[PATHLIKE, None] = None,
             ansys_version: str = ANSYSVERSION) -> pathlib.Path:
+    """Write solver file from cfx case file"""
+    cfx_filename = pathlib.Path(cfx_filename)
+    if def_filename is not None:
+        def_filename = pathlib.Path(def_filename)
+
     if def_filename is None:
         def_filename = cfx_filename.parent.joinpath(f'{cfx_filename.stem}.def')
 
     _orig_session_filename = SESSIONS_DIR.joinpath('cfx2def.pre')
     _tmp_session_filename = copy_session_file_to_tmp(_orig_session_filename)
-    replace_in_file(_tmp_session_filename, '__cfxfilename__', str(cfx_filename))
-    replace_in_file(_tmp_session_filename, '__deffilename__', str(def_filename))
+    replace_in_file(_tmp_session_filename, '__cfxfilename__', str(cfx_filename.absolute()))
+    replace_in_file(_tmp_session_filename, '__deffilename__', str(def_filename.absolute()))
     replace_in_file(_tmp_session_filename, '__version__', ansys_version)
-    play_session(_tmp_session_filename, wait=True)
+    play_session(_tmp_session_filename)
+    print(_tmp_session_filename)
     return def_filename
 
 
@@ -137,8 +142,7 @@ def replace_in_file(filename, keyword, new_string):
 
 
 def play_session(session_file: PATHLIKE,
-                 cfx5pre: Union[PATHLIKE, None] = None,
-                 wait: bool=True) -> None:
+                 cfx5pre: Union[PATHLIKE, None] = None) -> None:
     """
     Runs cfx5pre session file
 
@@ -159,5 +163,6 @@ def play_session(session_file: PATHLIKE,
     session_file = pathlib.Path(session_file)
 
     cmd = f'"{_cfx5path}" -batch "{session_file}"'
-    call_cmd(cmd, wait=wait)
+
+    call_cmd(cmd)
     return cmd

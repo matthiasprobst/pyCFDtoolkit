@@ -78,7 +78,7 @@ def get_monitor_data_by_category(target: Path, category: MonitorCategory = Monit
     logger.info(f'Generating user points file from "{target_filename.name}"')
     logger.debug(f'Generating user points file with bash str: {cmd}')
 
-    call_cmd(cmd, wait=True)
+    call_cmd(cmd)
     if not out_filename.exists():
         raise RuntimeError(f'Failed running bash script "{cmd}"')
 

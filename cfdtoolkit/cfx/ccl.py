@@ -847,7 +847,7 @@ def _generate_from_def(def_filename: PATHLIKE,
     if ccl_filename.exists() and overwrite:
         ccl_filename.unlink()
     cmd = f'"{CFX5CMDS}" -read -def "{def_filename}" -text "{ccl_filename}"'
-    call_cmd(cmd, wait=True)
+    call_cmd(cmd)
 
     if not ccl_filename.exists():
         raise RuntimeError(f'Failed running bash script "{cmd}"')

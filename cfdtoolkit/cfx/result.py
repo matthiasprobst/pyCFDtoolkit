@@ -79,7 +79,7 @@ class CFXResFile(CFXFile):
         return True
 
     def resume(self, nproc: int, def_filename: Union[PATHLIKE, None] = None,
-               timeout: str = None, wait: bool = True) -> str:
+               timeout: str = None) -> str:
         """resumes the computation from this result file
 
         Parameters
@@ -90,9 +90,6 @@ class CFXResFile(CFXFile):
             Definition file. If None, the filename will be assumed based on the result filename stem
         timeout: int
             Maximal time in seconds after which run is stopped independent of solver settings
-        wait: bool=False
-            If True, waits until command line call is finished. If False, python codes continues
-            immediately (Effectively, if False, '&' is added to the command line string)
 
         Returns
         -------
@@ -108,7 +105,7 @@ class CFXResFile(CFXFile):
                                   ini_filename=self.filename, timeout=timeout)
         else:
             raise FileNotFoundError(f'Could not find definition file: {def_filename}')
-        p = call_cmd(cmd, wait)
+        p = call_cmd(cmd)
         return cmd
 
     @property
