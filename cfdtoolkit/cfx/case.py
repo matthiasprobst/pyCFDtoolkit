@@ -60,6 +60,12 @@ class CFXCase(CFXFile):
         if self.def_filename is not None:
             if self.def_filename.exists():
                 self.def_filename.unlink()
+            hdf_filename = change_suffix(self.filename, '.hdf')
+            if hdf_filename.exists():
+                hdf_filename.unlink()
+            ccl_filename = change_suffix(self.filename, '.ccl')
+            if ccl_filename.exists():
+                ccl_filename.unlink()
 
     def update(self):
         """scan files"""

@@ -36,3 +36,4 @@ for r in case.res:
     r.outfile.data.cpu_seconds.plot()
 plt.show()
 case.info()
+case.reset()
