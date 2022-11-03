@@ -8,7 +8,7 @@ from typing import Union, List
 
 from . import solve
 from .core import OutFile, MonitorData
-from .utils import touch_stp
+from .utils import change_suffix, touch_stp
 from .. import CFX_DOTENV_FILENAME
 from ..typing import PATHLIKE
 
@@ -41,9 +41,6 @@ def _predict_new_res_filename(current_filename: PATHLIKE):
     return current_filename.parent.joinpath(f'{name_prefix}_{new_number:03d}.res')
 
 
-from .utils import change_suffix
-
-
 class CFXResFile:
     """Class wrapped around the *.res case file"""
 
@@ -53,6 +50,11 @@ class CFXResFile:
 
     def __repr__(self):
         return f'<CFXResFile name={self.name}>'
+
+    def unlink(self):
+        """delete the .res and .out file"""
+        self.filename.unlink()
+        self.outfile.filename.unlink()
 
     @property
     def name(self) -> str:

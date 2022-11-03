@@ -2,20 +2,15 @@ import dotenv
 import logging
 import os
 import pathlib
-import shutil
-import subprocess
-import time
-from typing import Union
+from typing import List
 
-from . import session
+from . import pre
 from . import solve
 from .core import AnalysisType
 from .core import CFXFile
-from .result import CFXResFile, CFXResFiles, _predict_new_res_filename
+from .result import CFXResFile
 from .utils import change_suffix
-from .utils import touch_stp
 from .. import CFX_DOTENV_FILENAME
-from ..typing import PATHLIKE
 
 logger = logging.getLogger(__package__)
 dotenv.load_dotenv(CFX_DOTENV_FILENAME)
@@ -23,12 +18,13 @@ dotenv.load_dotenv(CFX_DOTENV_FILENAME)
 CFX5SOLVE = os.environ.get("cfx5solve")
 
 
-# def update_cfx_case(func):
-#     def update_cfx_case_wrapper(*args, **kwargs):
-#         args[0].update()
-#         return func(*args, **kwargs)
-#
-#     return update_cfx_case_wrapper
+def update_case(func, *args, **kwargs):
+    def decorator(_self):
+        _self.update()
+        func(_self, *args, **kwargs)
+        _self.update()
+
+    return decorator
 
 
 class CFXCase(CFXFile):
@@ -50,11 +46,43 @@ class CFXCase(CFXFile):
         if not self.filename.exists():
             raise FileExistsError(f'CFX file does not exist: {self.filename}')
         self.res_files = []
+        self.def_filename = None
         self.update()
+
+    @update_case
+    def reset(self):
+        """Deletes all result files and the definition file, so that only the .cfx file
+        remains (or if this does not exist, the def file should remain)"""
+        if not self.filename.exists():
+            raise FileExistsError('Cannot delete the case because no .cfx file would remain for this case.')
+        for r in self.res_files:
+            r.unlink()
+        if self.def_filename is not None:
+            if self.def_filename.exists():
+                self.def_filename.unlink()
 
     def update(self):
         """scan files"""
         self.res_files = [CFXResFile(fname) for fname in sorted(self.working_dir.glob(f'{self.name}*.res'))]
+        self.def_filename = change_suffix(self.filename, '.def')
+
+    @property
+    def pre(self) -> pre.CFXPre:
+        """Return a CFXPre instance of this case file"""
+        self.update()
+        return pre.CFXPre(self.filename)
+
+    @property
+    def solve(self) -> solve.CFXSolve:
+        """Return a CFXPre instance of this case file"""
+        self.update()
+        return solve.CFXSolve(self.def_filename)
+
+    @property
+    def res(self) -> List[CFXResFile]:
+        """Return list of result files"""
+        self.update()
+        return self.res_files
 
     @property
     def name(self):
@@ -64,52 +92,23 @@ class CFXCase(CFXFile):
     def __repr__(self):
         return f'<CFXCase name: {self.name}>'
 
+    @update_case
     def info(self) -> None:
         """Print overview of case files"""
-        self.update()
         print(f'{"CFX Case":.^20s}')
         print(f' > name: {self.name}')
         print(f' > Working dir: {self.filename.parent}')
-        print(' > Result files:')
         nresfiles = len(self.res_files)
-        _n = len(str(nresfiles))
-        for i, resfile in enumerate(self.res_files):
-            print(f'     ({i+1:{_n}d}/{nresfiles}): {resfile.filename.name} ({resfile.outfile.filename.name})')
-        # if len(self.res_files) == 0:
-        #     _outstr += '\nNo result files yet'
-        # else:
-        #     for i, res_file in enumerate(self.res_files):
-        #         _outstr += f"\n\t#{i:3d}: {res_file.filename.name}"
-        # print(_outstr)
-
-    def refresh_results(self):
-        res_filename_list = list(self.working_dir.glob(f'{self.filename.stem}*.res'))
-        def_filename = change_suffix(self.filename, '.def')
-        self.res_files = CFXResFiles(filenames=res_filename_list, def_filename=def_filename)
-
-    def __str__(self):
-        return self.__repr__()
-
-    def __getitem__(self, item):
-        self.update()
-        return self.res_files[item]
-
-    def copy(self, new_name: Union[str, PATHLIKE]):
-        """copies this case .cfx file to a new location with a new name.
-        If a string is provided, the new file will be created at the same working directory.
-        A new instance of CFXCase is returned."""
-        if isinstance(new_name, str):
-            if not new_name.endswith('.cfx'):
-                new_name += '.cfx'
-            new_filename = self.working_dir.joinpath(new_name)
+        if nresfiles == 0:
+            print(' > No result files available')
         else:
-            new_filename = new_name
-        if not new_filename.parent.exists():
-            new_filename.parent.mkdir(parents=True)
-        if not new_filename.suffix == '.cfx':
-            raise ValueError(f'The new filename has a wrong suffix. Expected .cfx: {new_filename}')
-        return CFXCase(shutil.copy(self.filename, new_filename))
+            print(' > Result files:')
+            _n = len(str(nresfiles))
+            for i, resfile in enumerate(self.res_files):
+                print(f'     ({i + 1:{_n}d}/{nresfiles}): {resfile.filename.name} ({resfile.outfile.filename.name})')
+        print(f'{"":.^20s}')
 
+    @update_case
     def rename(self, new_name: str) -> None:
         """renames all files of this case to the new name if still available (no conflict with existing files
         in the working direcotry.
@@ -141,61 +140,6 @@ class CFXCase(CFXFile):
             s.rename(t)
 
         self.filename = new_filename
-        self.update()
-
-    # def update(self):
-    #     """Mainly scans for all relevant case files and updates content if needed"""
-    #     if not self.filename.suffix == '.cfx':
-    #         raise ValueError(f'Expected suffix .cfx and not {self.filename.suffix}')
-    #
-    #     self.working_dir = self.filename.parent
-    #
-    #     if not self.working_dir.exists():
-    #         raise NotADirectoryError('The working directory does not exist. Can only work with existing cases!')
-    #
-    #     def_filename = change_suffix(self.filename, '.def')
-    #     if not def_filename.exists():
-    #         def_filename = session.cfx2def(self.filename)
-    #         if not def_filename.exists():
-    #             raise RuntimeError(f'Seems that the solver file was not written from {self.filename}')
-    #
-    #     res_filename_list = list(self.working_dir.glob(f'{self.filename.stem}*.res'))
-    #     self.res_files = CFXResFiles(filenames=res_filename_list, def_filename=def_filename)
-    #
-    #     self.ccl = CCLFile(self.filename, aux_dir=self.aux_dir)
-    #
-    #     # # generate the .ccl file from the .def file if exists and younger than .cfx file
-    #     # # otherwise built from .cfx file
-    #     # if self.def_file.filename.exists():
-    #     #     if self.def_file.filename.stat().st_mtime > self.filename.stat().st_mtime:
-    #     #         self.ccl = self.def_file.generate_ccl()
-    #     #     else:
-    #     #         logger.info('The definition file is older than the cfx file. Writig new .def file and .ccl file')
-    #     #         self.def_file.update()
-    #     #         self.ccl = CCLFile(self.filename)
-    #     # else:
-    #     #     self.ccl = CCLFile(self.filename)
-
-    # @property
-    # def timestep(self):
-    #     """returns the time step of the registered def file thus calls timestep property of CFXDefFile instance"""
-    #     return self.def_file.timestep
-    #
-    # @timestep.setter
-    # def timestep(self, timestep):
-    #     """returns the time step of the registered def file thus calls timestep property of CFXDefFile instance"""
-    #     return self.def_file.set_timestep(timestep)
-
-    @property
-    def result_files(self):
-        """alias for self.res_files"""
-        return self.res_files
-
-    @property
-    def latest(self):
-        """Returns the latest .cfx file"""
-        self.refresh_results()
-        return self.res_files.latest
 
     @property
     def analysis_type(self) -> AnalysisType:
@@ -204,104 +148,3 @@ class CFXCase(CFXFile):
         if 'Steady State' in _target_grp.get_lines()[0]:
             return AnalysisType.STEADYSTATE
         return AnalysisType.TRANSIENT
-
-    def stop(self, wait: bool = True, timeout: int = 600) -> bool:
-        """touches a stp-file in the working directory. Returns True if file was detected, False if not"""
-        list_of_dir_names = list(self.working_dir.glob('*.dir'))
-        for d in list_of_dir_names:
-            if self.filename.stem == d.stem[:-4]:
-                touch_stp(d)
-
-        if len(list_of_dir_names) == 0:
-            print('Nothing to stop.')
-            return
-
-        if wait:
-            new_filename = _predict_new_res_filename(self.filename)
-            print(f'waiting for {new_filename}')
-            for i in range(timeout):
-                time.sleep(1)  # 1s
-            if new_filename.exists():
-                print(f'... file has been detected')
-            print(f'Waited {timeout} seconds but did not find {new_filename} during in the meantime.')
-            return False
-        return True
-
-    def start(self, initial_result_file: Union[None, CFXResFile, str, bytes, os.PathLike, pathlib.Path],
-              nproc: int, timeout: int = None, wait: bool = False) -> str:
-        """starts from a given initial solution of any result file provided or, if None, starts from
-        initial flow field"""
-        self.update_from_ccl()
-        def_filename = change_suffix(self.filename, '.def')
-        if initial_result_file is None:
-            # if len(self.res_files) == 0:
-            cmd = solve.build_cmd(def_filename=def_filename, nproc=nproc,
-                                  ini_filename=None, timeout=timeout)
-            subprocess.call(cmd)
-            return cmd
-
-        if isinstance(initial_result_file, CFXResFile):
-            _initial_result_file = initial_result_file.filename
-            _init = CFXResFile(filename=_initial_result_file, def_filename=def_filename)
-        else:  # path is given
-            _init = CFXResFile(filename=initial_result_file, def_filename=def_filename)
-        return _init.resume(nproc, timeout, wait=wait)
-
-    def resume(self, *args, **kwargs):
-        """updates cfx file and def file from ccl file and resumes on latest"""
-        logger.info(f'Updateing cfx from ccl file')
-        self.update_from_ccl()
-        session.cfx2def(self.filename)
-        self.latest.resume(*args, **kwargs)
-
-    def update_from_ccl(self):
-        """Imports a .ccl file into a .cfx file and saves the .cfx file"""
-        ccl_filename = self.ccl.to_ccl(change_suffix(self.ccl.filename, '.ccl'))
-        _ = session.importccl(self.filename, ccl_filename)
-        self.update()
-
-    # def _scan_res_files(self):
-    #     res_filename_list = list(self.working_dir.glob(f'{self.filename.stem}*.res'))
-    #     self.res_files = CFXResFiles(res_filename_list, def_filename)
-
-    def _predict_new_res_filename(self):
-        return _predict_new_res_filename(self.filename)
-
-    def reset(self, force=True):
-        """Resets the case, so deletes .out and .res files"""
-        if not force:
-            answer = input('Are you sure? This will delete the following file patterns: '
-                           f'{self.filename.stem}*.out and {self.filename.stem}*.res [y/N]')
-        else:
-            answer = 'y'
-        if answer == 'y':
-            _list_of_files = self.working_dir.glob(f'{self.filename.stem}*.out')
-            _ = [f.unlink() for f in _list_of_files]
-            _list_of_files = self.working_dir.glob(f'{self.filename.stem}*.res')
-            _ = [f.unlink() for f in _list_of_files]
-            _list_of_files = self.working_dir.glob(f'{self.filename.stem}*[0-9]')
-            _ = [shutil.rmtree(f) for f in _list_of_files]
-            _list_of_files = self.aux_dir.glob(f'{self.filename.stem}*.monitor')
-            _ = [f.unlink() for f in _list_of_files]
-
-    # @property
-    # def expression(self):
-    #     return "expression"
-    #
-    # @expression.setter
-    # def expression(self, expr_dict: dict):
-    #     if not isinstance(expr_dict, dict):
-    #         raise TypeError(f'Expression value must type dict not {type(expr_dict)}')
-    #     expr = self.ccl.expressions
-
-#
-# class SteadyStateCFX(CFXCase):
-#     def __init__(self, working_dir='.'):
-#         super().__init__(working_dir)
-#         self.result_directory = self.working_dir.joinpath('steady_state')
-#         if not self.result_directory.exists():
-#             self.result_directory.mkdir()
-#
-#
-# class TransientCFX(CFXCase):
-#     pass

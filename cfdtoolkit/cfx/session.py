@@ -63,7 +63,7 @@ def cfx2def(cfx_filename: PATHLIKE, def_filename: Union[PATHLIKE, None] = None,
     replace_in_file(_tmp_session_filename, '__deffilename__', str(def_filename.absolute()))
     replace_in_file(_tmp_session_filename, '__version__', ansys_version)
     play_session(_tmp_session_filename)
-    print(_tmp_session_filename)
+
     return def_filename
 
 

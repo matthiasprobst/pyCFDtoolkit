@@ -1,6 +1,7 @@
 import pathlib
 from dataclasses import dataclass
 
+from . import solve
 from .ccl import CCLFile
 from .exe import CFXExe, NPROC_MAX
 from .session import cfx2def, importccl
@@ -35,7 +36,7 @@ class CFXPre(CFXExe):
             cmd += f' -maxet \"{int(timeout_s)} [s]\"'  # e.g. maxet='10 [min]'
         return cmd
 
-    def write_def(self, target_dir: pathlib.Path = None) -> pathlib.Path:
+    def write_def(self, target_dir: pathlib.Path = None) -> solve.CFXSolve:
         """Write definition file"""
         if target_dir is not None:
             target_dir = pathlib.Path(target_dir)
@@ -45,12 +46,20 @@ class CFXPre(CFXExe):
         else:
             def_filename = None
         _ = self.get_exe('cfx5pre')  # to set self.exe_filename
-        return cfx2def(self.filename, def_filename, ansys_version=self.version)
+        return solve.CFXSolve(
+            cfx2def(
+                self.filename,
+                def_filename,
+                ansys_version=self.version
+            )
+        )
 
     @staticmethod
     def from_h5ccl(h5ccl_filename: pathlib.Path) -> "CFXPre":
         """Read from HDF5-ccl file"""
         h5ccl_filename = pathlib.Path(h5ccl_filename)
+        if h5ccl_filename.suffix not in ('.h5', '.hdf', '.hdf5'):
+            raise ValueError(f'Unexpected suffix. Expected .h5, .hdf or .hdf5 but not {h5ccl_filename.suffix}')
         if not h5ccl_filename.exists():
             raise FileNotFoundError(f'CCL file not found: {h5ccl_filename}')
         ccl = CCLFile(h5ccl_filename)

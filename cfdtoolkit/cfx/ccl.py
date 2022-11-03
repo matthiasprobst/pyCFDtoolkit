@@ -252,7 +252,8 @@ class CCLTextFile:
             if grp.group_type == 'FLOW':
                 return grp
 
-    def to_hdf(self, hdf_filename: Union[PATHLIKE, None] = None, overwrite=True):
+    def to_hdf(self, hdf_filename: Union[PATHLIKE, None] = None, overwrite=True) -> pathlib.Path:
+        """Write ccl content to HDF5"""
         if hdf_filename is None:
             hdf_filename = change_suffix(self.filename, '.hdf')
         else:
@@ -331,6 +332,11 @@ class CCLHDFAttributWrapper:
     def __setitem__(self, key, value):
         with h5py.File(self.filename, 'r+') as h5:
             # if key not in h5[self.path].attrs.keys():
+            if key not in h5[self.path].attrs:
+                raise AttributeError(f'HDF5 attribute {key} not in {self.path}')
+            initial_value = h5[self.path].attrs[key]
+            if not isinstance(value, type(initial_value)):
+                raise ValueError(f'Attribute mut be of type "{type(initial_value)}" but got type "{type(value)}"')
             h5[self.path].attrs[key] = value
         # with h5py.File(self.filename, 'r+') as h5:
         # _ = self.values[key]  # let python raise the error if key not in self.values
@@ -711,11 +717,11 @@ class CCLFile:
         """
         # logger.debug('reading ccl')
         filename = pathlib.Path(filename)
-        if filename.suffix in ('.hdf', '.cclh5'):
+        if filename.suffix in ('.hdf', '.hdf'):
             self.filename = filename
             self.aux_dir = filename.parent
         elif filename.suffix == '.ccl':
-            _hdf_fname = change_suffix(filename, '.cclh5')
+            _hdf_fname = change_suffix(filename, '.hdf')
             if aux_dir is not None:
                 self.aux_dir = aux_dir
                 _hdf_fname = _hdf_fname.parent.joinpath(self.aux_dir).joinpath(_hdf_fname.name)
@@ -726,7 +732,7 @@ class CCLFile:
             if aux_dir is not None:
                 self.aux_dir = aux_dir
                 _ccl_fname = _ccl_fname.parent.joinpath(self.aux_dir).joinpath(_ccl_fname.name)
-            _hdf_fname = change_suffix(_ccl_fname, '.cclh5')
+            _hdf_fname = change_suffix(_ccl_fname, '.hdf')
             self.filename = CCLTextFile(generate(filename, ccl_filename=_ccl_fname)).to_hdf(_hdf_fname)
 
         else:
@@ -769,6 +775,7 @@ class CCLFile:
         return CCLHDFGroup('LIBRARY/CEL/EXPRESSIONS', self.filename)
 
     def to_ccl(self, ccl_filename: Union[PATHLIKE, None]) -> pathlib.Path:
+        """convert to original .ccl file format"""
         if ccl_filename is None:
             ccl_filename = change_suffix(self.filename, '.ccl')
         return hdf_to_ccl(self.filename, ccl_filename, intendation_step=INTENDATION_STEP)

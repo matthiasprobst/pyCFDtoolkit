@@ -40,8 +40,13 @@ def extract_out_data(ansys_cfx_out_file: str) -> xr.Dataset:
             data['cpu_seconds'].append(float(split3.strip()))
         elif 'OUTER LOOP ITERATION = ' in line:
             # steady state
-            data['iteration'].append(int(line.split('=')[1].split('CPU SECONDS')[0].strip()))
-            data['cpu_seconds'].append(float(line.rsplit('=', 1)[-1].strip()))
+            # if it is a restarted file, then there are brackets in that line!
+            if '(' in line:
+                data['iteration'].append(int(line.split('=')[1].split('(', 1)[0].strip()))
+                data['cpu_seconds'].append(float(line.split('=')[-1].split('(', 1)[0].strip()))
+            else:
+                data['iteration'].append(int(line.split('=')[1].split('CPU SECONDS')[0].strip()))
+                data['cpu_seconds'].append(float(line.rsplit('=', 1)[-1].strip()))
         elif 'Rotated in this time step [degrees]' in line:
             data['rotation_per_timestep'].append(float(line.split('=')[1].strip()))
         elif 'Rotated up to now [degrees]' in line:

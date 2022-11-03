@@ -1,7 +1,9 @@
 import pathlib
 import subprocess
 from dataclasses import dataclass
+from typing import Union
 
+from . import result as res
 from .ccl import _generate_from_def
 from .exe import CFXExe, NPROC_MAX
 from .utils import change_suffix
@@ -36,8 +38,20 @@ class CFXSolve(CFXExe):
             cmd += f' -maxet \"{int(timeout_s)} [s]\"'  # e.g. maxet='10 [min]'
         return cmd
 
-    def run(self, nproc: int, ini_filename: pathlib.Path = None, timeout_s: int = None, **kwargs):
+    def run(self, nproc: int,
+            ini_filename: Union[pathlib.Path, res.CFXResFile] = None,
+            timeout_s: int = None, **kwargs):
         """Run the solver"""
+        if ini_filename is None:
+            existing_res_files = list(self.filename.parent.glob(f'{self.filename.stem}*.res'))
+            if len(existing_res_files) > 0:
+                raise ValueError('There are result files for this case but you decided to '
+                                 'run without an initial solution. '
+                                 'Consider resetting the case by deleting all res files of '
+                                 'the case. You may pass the parameter.')
+        if isinstance(ini_filename, res.CFXResFile):
+            ini_filename = ini_filename.filename
+
         cmd = self._generate_cmd(nproc, ini_filename, timeout_s=timeout_s)
         if kwargs.get('verbose', False):
             print(cmd)
