@@ -1,23 +1,22 @@
+import dotenv
+import h5py
 import logging
+import numpy as np
 import os
 import pathlib
 import shutil
+import subprocess
+from IPython.display import display, HTML
 from dataclasses import dataclass
 from typing import Union, List
 
-import dotenv
-import h5py
-import numpy as np
-from IPython.display import display, HTML
-from .._html import h5file_html_repr
-
 from . import session
 from .boundary_conditions import CFXBoundaryCondition
-from .cmd import call_cmd
 from .core import MonitorObject
 from .session import cfx2def
 from .utils import change_suffix
 from .. import CFX_DOTENV_FILENAME, SESSIONS_DIR
+from .._html import h5file_html_repr
 from ..typing import PATHLIKE
 
 dotenv.load_dotenv(CFX_DOTENV_FILENAME)
@@ -847,7 +846,7 @@ def _generate_from_def(def_filename: PATHLIKE,
     if ccl_filename.exists() and overwrite:
         ccl_filename.unlink()
     cmd = f'"{CFX5CMDS}" -read -def "{def_filename}" -text "{ccl_filename}"'
-    call_cmd(cmd)
+    subprocess.run(cmd, shell=True)
 
     if not ccl_filename.exists():
         raise RuntimeError(f'Failed running bash script "{cmd}"')

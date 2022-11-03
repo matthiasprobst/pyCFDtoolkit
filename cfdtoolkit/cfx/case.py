@@ -1,16 +1,14 @@
+import dotenv
 import logging
 import os
 import pathlib
 import shutil
+import subprocess
 import time
 from typing import Union
 
-import dotenv
-
 from . import session
 from . import solve
-from .ccl import CCLFile
-from .cmd import call_cmd
 from .core import AnalysisType
 from .core import CFXFile
 from .result import CFXResFile, CFXResFiles, _predict_new_res_filename
@@ -51,7 +49,12 @@ class CFXCase(CFXFile):
         super().__init__(filename)
         if not self.filename.exists():
             raise FileExistsError(f'CFX file does not exist: {self.filename}')
+        self.res_files = []
         self.update()
+
+    def update(self):
+        """scan files"""
+        self.res_files = [CFXResFile(fname) for fname in sorted(self.working_dir.glob(f'{self.name}*.res'))]
 
     @property
     def name(self):
@@ -59,14 +62,25 @@ class CFXCase(CFXFile):
         return self.filename.stem
 
     def __repr__(self):
-        self.refresh_results()
-        _outstr = f"Working dir: {self.filename.parent}"
-        if len(self.res_files) == 0:
-            _outstr += '\nNo result files yet'
-        else:
-            for i, res_file in enumerate(self.res_files):
-                _outstr += f"\n\t#{i:3d}: {res_file.filename.name}"
-        return _outstr
+        return f'<CFXCase name: {self.name}>'
+
+    def info(self) -> None:
+        """Print overview of case files"""
+        self.update()
+        print(f'{"CFX Case":.^20s}')
+        print(f' > name: {self.name}')
+        print(f' > Working dir: {self.filename.parent}')
+        print(' > Result files:')
+        nresfiles = len(self.res_files)
+        _n = len(str(nresfiles))
+        for i, resfile in enumerate(self.res_files):
+            print(f'     ({i+1:{_n}d}/{nresfiles}): {resfile.filename.name} ({resfile.outfile.filename.name})')
+        # if len(self.res_files) == 0:
+        #     _outstr += '\nNo result files yet'
+        # else:
+        #     for i, res_file in enumerate(self.res_files):
+        #         _outstr += f"\n\t#{i:3d}: {res_file.filename.name}"
+        # print(_outstr)
 
     def refresh_results(self):
         res_filename_list = list(self.working_dir.glob(f'{self.filename.stem}*.res'))
@@ -129,38 +143,38 @@ class CFXCase(CFXFile):
         self.filename = new_filename
         self.update()
 
-    def update(self):
-        """Mainly scans for all relevant case files and updates content if needed"""
-        if not self.filename.suffix == '.cfx':
-            raise ValueError(f'Expected suffix .cfx and not {self.filename.suffix}')
-
-        self.working_dir = self.filename.parent
-
-        if not self.working_dir.exists():
-            raise NotADirectoryError('The working directory does not exist. Can only work with existing cases!')
-
-        def_filename = change_suffix(self.filename, '.def')
-        if not def_filename.exists():
-            def_filename = session.cfx2def(self.filename)
-            if not def_filename.exists():
-                raise RuntimeError(f'Seems that the solver file was not written from {self.filename}')
-
-        res_filename_list = list(self.working_dir.glob(f'{self.filename.stem}*.res'))
-        self.res_files = CFXResFiles(filenames=res_filename_list, def_filename=def_filename)
-
-        self.ccl = CCLFile(self.filename, aux_dir=self.aux_dir)
-
-        # # generate the .ccl file from the .def file if exists and younger than .cfx file
-        # # otherwise built from .cfx file
-        # if self.def_file.filename.exists():
-        #     if self.def_file.filename.stat().st_mtime > self.filename.stat().st_mtime:
-        #         self.ccl = self.def_file.generate_ccl()
-        #     else:
-        #         logger.info('The definition file is older than the cfx file. Writig new .def file and .ccl file')
-        #         self.def_file.update()
-        #         self.ccl = CCLFile(self.filename)
-        # else:
-        #     self.ccl = CCLFile(self.filename)
+    # def update(self):
+    #     """Mainly scans for all relevant case files and updates content if needed"""
+    #     if not self.filename.suffix == '.cfx':
+    #         raise ValueError(f'Expected suffix .cfx and not {self.filename.suffix}')
+    #
+    #     self.working_dir = self.filename.parent
+    #
+    #     if not self.working_dir.exists():
+    #         raise NotADirectoryError('The working directory does not exist. Can only work with existing cases!')
+    #
+    #     def_filename = change_suffix(self.filename, '.def')
+    #     if not def_filename.exists():
+    #         def_filename = session.cfx2def(self.filename)
+    #         if not def_filename.exists():
+    #             raise RuntimeError(f'Seems that the solver file was not written from {self.filename}')
+    #
+    #     res_filename_list = list(self.working_dir.glob(f'{self.filename.stem}*.res'))
+    #     self.res_files = CFXResFiles(filenames=res_filename_list, def_filename=def_filename)
+    #
+    #     self.ccl = CCLFile(self.filename, aux_dir=self.aux_dir)
+    #
+    #     # # generate the .ccl file from the .def file if exists and younger than .cfx file
+    #     # # otherwise built from .cfx file
+    #     # if self.def_file.filename.exists():
+    #     #     if self.def_file.filename.stat().st_mtime > self.filename.stat().st_mtime:
+    #     #         self.ccl = self.def_file.generate_ccl()
+    #     #     else:
+    #     #         logger.info('The definition file is older than the cfx file. Writig new .def file and .ccl file')
+    #     #         self.def_file.update()
+    #     #         self.ccl = CCLFile(self.filename)
+    #     # else:
+    #     #     self.ccl = CCLFile(self.filename)
 
     # @property
     # def timestep(self):
@@ -223,7 +237,7 @@ class CFXCase(CFXFile):
             # if len(self.res_files) == 0:
             cmd = solve.build_cmd(def_filename=def_filename, nproc=nproc,
                                   ini_filename=None, timeout=timeout)
-            call_cmd(cmd)
+            subprocess.call(cmd)
             return cmd
 
         if isinstance(initial_result_file, CFXResFile):

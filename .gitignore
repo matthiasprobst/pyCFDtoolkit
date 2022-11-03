@@ -2,6 +2,11 @@
 __pycache__/
 *.py[cod]
 *$py.class
+*.ccl
+*.cfx
+*.out
+*.def
+*.cclh5
 
 # C extensions
 *.so

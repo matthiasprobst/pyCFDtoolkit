@@ -1,14 +1,12 @@
+import dotenv
 import logging
 import os
 import pathlib
+import subprocess
 import time
 from typing import Union, List
 
-import dotenv
-
 from . import solve
-from .cmd import call_cmd
-from .core import CFXFile
 from .core import OutFile, MonitorData
 from .utils import touch_stp
 from .. import CFX_DOTENV_FILENAME
@@ -43,18 +41,22 @@ def _predict_new_res_filename(current_filename: PATHLIKE):
     return current_filename.parent.joinpath(f'{name_prefix}_{new_number:03d}.res')
 
 
-class CFXResFile(CFXFile):
+from .utils import change_suffix
+
+
+class CFXResFile:
     """Class wrapped around the *.res case file"""
 
-    def __init__(self, filename, def_filename):
-        super(CFXResFile, self).__init__(filename)
-        self.case_stem = self.filename.stem.rsplit('_', 1)[0]
-        self.def_filename = def_filename
+    def __init__(self, filename):
+        self.filename = pathlib.Path(filename)
+        self.outfile = OutFile(change_suffix(self.filename, '.out'))
 
     def __repr__(self):
-        if self.is_latest:
-            return f'CFX Result file: {self.filename.name} (latest result file)'
-        return f'CFX Result file: {self.filename.name}'
+        return f'<CFXResFile name={self.name}>'
+
+    @property
+    def name(self) -> str:
+        return self.filename.stem
 
     @property
     def monitor(self):
@@ -105,7 +107,7 @@ class CFXResFile(CFXFile):
                                   ini_filename=self.filename, timeout=timeout)
         else:
             raise FileNotFoundError(f'Could not find definition file: {def_filename}')
-        p = call_cmd(cmd)
+        p = subprocess.run(cmd, shell=True)
         return cmd
 
     @property

@@ -1,12 +1,11 @@
-import pathlib
-from enum import Enum
-from typing import Dict
-from typing import Union
-
 import dotenv
 import pandas as pd
+import pathlib
 import xarray as xr
+from enum import Enum
 from numpy.typing import ArrayLike
+from typing import Dict
+from typing import Union
 
 from . import mon
 from .out import extract_out_data, mesh_info_from_file
@@ -145,23 +144,29 @@ class MonitorData(CFXFile):
         return self.data.user_points
 
 
-class OutFile(MonitorData):
+class OutFile:
+    """.out-file interface class"""
 
     def __init__(self, filename):
-        super().__init__(filename)
-        _out_filename = f'{self.filename.stem}.outdata'
-        self._out_filename = self.aux_dir.joinpath(_out_filename)
+        self.filename = filename
 
-    def _estimate_out_filename(self):
-        return self.filename.parent.joinpath(f'{self.filename.stem}.out')
+    def __repr__(self):
+        return f'<OutFile {self.filename}>'
 
-    def _write_file(self) -> None:
-        if not self._estimate_out_filename().exists():
-            raise FileExistsError(f'*.out file note found. Guessed it here: "{self._estimate_out_filename()}"')
-        self._data = extract_out_data(self._estimate_out_filename())
-        self._data.to_csv(self._out_filename)
+    @property
+    def name(self):
+        """Filename stem"""
+        return self.filename.stem
+
+    @property
+    def data(self) -> pd.DataFrame:
+        """Return data as data frame"""
+        if not self.filename.exists():
+            raise FileNotFoundError(f'File not found: {self.filename}')
+        return extract_out_data(self.filename)
 
     def get_mesh_info(self) -> pd.DataFrame:
-        if self._out_filename.exist():
-            return mesh_info_from_file(self.filename)
-        return pd.DataFrame()
+        """Return mesh info as pd.DataFrame"""
+        if not self.filename.exists():
+            raise FileNotFoundError(f'File not found: {self.filename}')
+        return mesh_info_from_file(self.filename)

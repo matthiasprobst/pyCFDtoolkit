@@ -1,65 +1,89 @@
-import pandas as pd
+import datetime
+import numpy as np
+import xarray as xr
+from typing import Dict
+
+DATETIME_FMT = '%Y-%m-%dT%H:%M:%S'
 
 
-def extract_out_data(ansys_cfx_out_file: str) -> pd.DataFrame:
+def extract_out_data(ansys_cfx_out_file: str) -> xr.Dataset:
     """tries to extract data from an *.out file"""
 
     # from a rotor simulation gets rotor positions
-
+    ansys_cfx_out_file = str(ansys_cfx_out_file)
     with open(ansys_cfx_out_file, "r") as f:
         lines = f.readlines()
 
-    iteration = list()
-    timestep = list()
-    simulation_time = list()
-    cpu_seconds = list()
-    rotation_per_timestep = list()
-    rotated_deg_up_to_now = list()
-    rotated_pitches_up_to_now = list()
-    courant_number_rms = list()
-    courant_number_max = list()
+    data = dict(
+        iteration=[],
+        timestep=[],
+        simulation_time=[],
+        cpu_seconds=[],
+        rotation_per_timestep=[],
+        rotated_deg_up_to_now=[],
+        rotated_pitches_up_to_now=[],
+        courant_number_rms=[],
+        courant_number_max=[])
+    attrs = {}
     for (iline, line) in enumerate(lines):
+        if iline == 0:
+            dtstr = line.split('at', 1)[1].strip()
+            attrs['solver_start_datetime'] = datetime.datetime.strptime(
+                dtstr, '%H:%M:%S on %d %b %Y'
+            ).strftime(DATETIME_FMT)
+
         if 'TIME STEP =' in line:
+            # if transient
             _, split1, split2, split3 = line.split('=')
-            iteration.append(int(split1.split('SIMULATION')[0].strip()))
-            simulation_time.append(float(split2.split('CPU')[0].strip()))
-            cpu_seconds.append(float(split3.strip()))
+            data['iteration'].append(int(split1.split('SIMULATION')[0].strip()))
+            data['simulation_time'].append(float(split2.split('CPU')[0].strip()))
+            data['cpu_seconds'].append(float(split3.strip()))
+        elif 'OUTER LOOP ITERATION = ' in line:
+            # steady state
+            data['iteration'].append(int(line.split('=')[1].split('CPU SECONDS')[0].strip()))
+            data['cpu_seconds'].append(float(line.rsplit('=', 1)[-1].strip()))
         elif 'Rotated in this time step [degrees]' in line:
-            rotation_per_timestep.append(float(line.split('=')[1].strip()))
+            data['rotation_per_timestep'].append(float(line.split('=')[1].strip()))
         elif 'Rotated up to now [degrees]' in line:
-            rotated_deg_up_to_now.append(float(line.split('=')[1].strip()))
+            data['rotated_deg_up_to_now'].append(float(line.split('=')[1].strip()))
         elif 'Rotated number of pitches up to now' in line:
-            rotated_pitches_up_to_now.append(float(line.split('=')[1].strip()))
+            data['rotated_pitches_up_to_now'].append(float(line.split('=')[1].strip()))
         elif 'Timestepping Information' in line:
             if 'Acoustic' in lines[iline + 2]:
                 # print('this is an acoustic computation!!!')
                 dt, _courant_number_rms_max, _acoustic_courant_number_rms_max = lines[iline + 6].split('|')[1:4]
                 # print(f'dt={dt}, _courant_number_rms_max={_courant_number_rms_max},'
                 #       f' _acoustic_courant_number_rms_max={_acoustic_courant_number_rms_max}')
-                timestep.append(float(dt.strip()))
+                data['timestep'].append(float(dt.strip()))
                 _splitted = _courant_number_rms_max.strip()[0].split(' ')
                 _courant_number_rms, _courant_number_max = _splitted[0], _splitted[-1]
-                courant_number_rms.append(float(_courant_number_rms.strip()))
-                courant_number_max.append(float(_courant_number_max.strip()))
+                data['courant_number_rms'].append(float(_courant_number_rms.strip()))
+                data['courant_number_max'].append(float(_courant_number_max.strip()))
             else:
                 dt, _courant_number_rms, _courant_number_max = lines[iline + 4].split('|')[1:4]
-                timestep.append(float(dt.strip()))
-                courant_number_rms.append(float(_courant_number_rms.strip()))
-                courant_number_max.append(float(_courant_number_max.strip()))
+                data['timestep'].append(float(dt.strip()))
+                data['courant_number_rms'].append(float(_courant_number_rms.strip()))
+                data['courant_number_max'].append(float(_courant_number_max.strip()))
+        elif 'Job finished:' in line:
+            dtimestr = line.split(':', 1)[1].strip()
+            attrs['job_finished_datetime'] = datetime.datetime.strptime(
+                dtimestr, '%a %b  %d %H:%M:%S %Y'
+            ).strftime(DATETIME_FMT)
+    scale_ds_names = ('iteration', 'timestep', 'simulation_time')
+    return_data = {k: np.asarray(v) for k, v in data.items() if len(v) > 0 and k not in scale_ds_names}
+    iteration = data.get('iteration')
 
-    return pd.DataFrame({'timestep': timestep,
-                         'iteration': iteration,
-                         'simulation_time': simulation_time,
-                         'cpu_seconds': cpu_seconds,
-                         'rotation_per_timestep': rotation_per_timestep,
-                         'rotated_deg_up_to_now': rotated_deg_up_to_now,
-                         'rotated_pitches_up_to_now': rotated_pitches_up_to_now,
-                         'courant_number_rms': courant_number_rms,
-                         'courant_number_max': courant_number_max}
-                        )
+    ds = xr.Dataset(data_vars={k: (['iteration'], v) for k, v in return_data.items()},
+                    coords={'iteration': np.asarray(iteration)},
+                    attrs=attrs)
+    ds['iteration'].attrs['units'] = ' '
+    if 'cpu_seconds' in ds:
+        ds['cpu_seconds'].attrs['units'] = 's'
+    return ds
 
 
-def mesh_info_from_file(ansys_cfx_out_file) -> pd.DataFrame:
+def mesh_info_from_file(ansys_cfx_out_file) -> Dict:
+    """get mesh info from an .out-file"""
     with open(ansys_cfx_out_file, "r") as f:
         lines = f.readlines()
 
@@ -82,7 +106,7 @@ def mesh_info_from_file(ansys_cfx_out_file) -> pd.DataFrame:
     for iline in range(iend - istart):
         line = lines[istart + iline].strip()
 
-        if " Domain Name :" in line:
+        if "Domain Name :" in line:
             domain_name.append(line.split(":")[1].strip())
             domain_name_iline.append(iline)
 
@@ -95,4 +119,4 @@ def mesh_info_from_file(ansys_cfx_out_file) -> pd.DataFrame:
     mesh_dict = {}
     for (name, mesh) in zip(domain_name, domain_mesh):
         mesh_dict[name] = int(mesh)
-    return pd.DataFrame(mesh_dict)
+    return mesh_dict

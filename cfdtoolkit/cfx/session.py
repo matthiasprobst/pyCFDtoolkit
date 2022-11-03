@@ -3,10 +3,10 @@ import logging
 import os
 import pathlib
 import shutil
+import subprocess
 import tempfile
 from typing import Union
 
-from .cmd import call_cmd
 from .utils import change_suffix, ansys_version_from_inst_dir
 from .. import CFX_DOTENV_FILENAME
 from .. import SESSIONS_DIR
@@ -164,5 +164,5 @@ def play_session(session_file: PATHLIKE,
 
     cmd = f'"{_cfx5path}" -batch "{session_file}"'
 
-    call_cmd(cmd)
+    subprocess.run(cmd, shell=True)
     return cmd
