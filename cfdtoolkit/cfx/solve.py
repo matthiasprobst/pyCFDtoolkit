@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from typing import Union
 
 from . import result as res
-from .ccl import _generate_from_def
+from .ccl import _generate_from_def, CCLFile
 from .exe import CFXExe, NPROC_MAX
 from .utils import change_suffix
 
@@ -57,8 +57,9 @@ class CFXSolve(CFXExe):
             print(cmd)
         return subprocess.run(cmd, shell=True)
 
-    def write_ccl(self, target_dir: pathlib.Path = None,
-                  overwrite: bool = True) -> pathlib.Path:
+    def write_ccl(self,
+                  target_dir: pathlib.Path = None,
+                  overwrite: bool = True) -> CCLFile:
         """write ccl file from .def-file"""
         if not self.filename.exists():
             raise FileNotFoundError(f'Definition file not found: "{self.filename}".')
@@ -70,6 +71,6 @@ class CFXSolve(CFXExe):
             ccl_filename = target_dir / f'{self.filename.stem}.ccl'
         else:
             ccl_filename = change_suffix(self.filename, '.ccl')
-        return _generate_from_def(def_filename=self.filename,
-                                  ccl_filename=ccl_filename,
-                                  overwrite=overwrite)
+        return CCLFile(_generate_from_def(def_filename=self.filename,
+                                          ccl_filename=ccl_filename,
+                                          overwrite=overwrite))
