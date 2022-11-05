@@ -46,6 +46,8 @@ class CFXCase(CFXFile):
         super().__init__(filename)
         if not self.filename.exists():
             raise FileExistsError(f'CFX file does not exist: {self.filename}')
+        if self.filename.suffix != '.cfx':
+            raise ValueError(f'Not a cfx case file. Expecting suffix ".cfx" but found "{self.filename.suffix}"')
         self.res_files = []
         self.def_filename = None
         self.update()
