@@ -66,6 +66,7 @@ class CFXSolve(CFXExe):
 
         if target_dir is not None:
             target_dir = pathlib.Path(target_dir)
+            target_dir.mkdir(parents=True, exist_ok=True)
             if not target_dir.is_dir():
                 raise ValueError(f'Parameter target_dir is not a directory: {target_dir}')
             ccl_filename = target_dir / f'{self.filename.stem}.ccl'

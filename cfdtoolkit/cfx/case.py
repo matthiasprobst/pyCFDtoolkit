@@ -1,8 +1,9 @@
-import dotenv
 import logging
 import os
 import pathlib
 from typing import List
+
+import dotenv
 
 from . import pre
 from . import solve
@@ -48,6 +49,10 @@ class CFXCase(CFXFile):
         self.res_files = []
         self.def_filename = None
         self.update()
+
+    def __len__(self) -> int:
+        """Number of result files"""
+        return len(self.res_files)
 
     @update_case
     def reset(self):

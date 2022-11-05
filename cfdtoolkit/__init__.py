@@ -51,3 +51,6 @@ def _write_dot_env_file(inst_dir, overwrite=False):
         f.write(f'cfx5stop = {inst_dir}/bincfx5stop\n')
         f.write(f'cfx5cmds = {inst_dir}/bincfx5cmds\n')
         f.write(f'cfx5mondata = {inst_dir}/bincfx5mondata')
+
+
+from .cfx import CFXCase
