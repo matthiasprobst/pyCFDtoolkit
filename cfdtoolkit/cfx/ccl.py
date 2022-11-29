@@ -1,14 +1,15 @@
-import dotenv
-import h5py
 import logging
-import numpy as np
 import os
 import pathlib
 import shutil
 import subprocess
-from IPython.display import display, HTML
 from dataclasses import dataclass
 from typing import Union, List
+
+import dotenv
+import h5py
+import numpy as np
+from IPython.display import display, HTML
 
 from . import session
 from .boundary_conditions import CFXBoundaryCondition
@@ -640,14 +641,14 @@ class CCLHDFFlowGroup(CCLHDFGroup):
                 raise AttributeError(f'This is a steady state run!')
 
     @property
-    def max_number_of_timesteps(self):
+    def max_number_of_timesteps(self) -> int:
         with h5py.File(self.filename, 'r') as h5:
             if 'TIME DURATION' in h5[self.path]['ANALYSIS TYPE']:
                 return int(h5[self.path]['ANALYSIS TYPE/TIME DURATION'].attrs['Maximum Number of Timesteps'])
             else:
                 raise AttributeError(f'This is a steady state run!')
 
-    @total_time.setter
+    @max_number_of_timesteps.setter
     def max_number_of_timesteps(self, time_step):
         """max number of timesteps"""
         with h5py.File(self.filename, 'r+') as h5:
@@ -665,7 +666,7 @@ class CCLHDFFlowGroup(CCLHDFGroup):
             else:
                 raise AttributeError(f'This is a steady state run!')
 
-    @total_time.setter
+    @time_duration.setter
     def time_duration(self, time: Union[dict, list, tuple]):
         if not isinstance(time, (dict, list, tuple)):
             raise TypeError('Time information to stop the simulation must be a dictionary, a tuple or a list,'
