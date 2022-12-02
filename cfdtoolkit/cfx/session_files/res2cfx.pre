@@ -1,0 +1,10 @@
+COMMAND FILE:
+  CFX Pre Version = 20.2
+END
+
+>load filename=__resfilename__, mode=\
+def, recoverSession=no, replaceFlow=yes, overwrite=yes
+> update
+
+>writeCaseFile filename=__cfxfilename__
+> update

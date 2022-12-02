@@ -11,6 +11,7 @@ from .core import OutFile, MonitorData
 from .utils import change_suffix, touch_stp
 from .. import CFX_DOTENV_FILENAME
 from ..typing import PATHLIKE
+from .session import run_session_file
 
 dotenv.load_dotenv(CFX_DOTENV_FILENAME)
 
@@ -41,6 +42,15 @@ def _predict_new_res_filename(current_filename: PATHLIKE):
     return current_filename.parent.joinpath(f'{name_prefix}_{new_number:03d}.res')
 
 
+def res2cfx(cfx_filename):
+    _cfx_filename = pathlib.Path(cfx_filename)
+    case_parent = _cfx_filename.parent
+    case_name = _cfx_filename.stem.rsplit('_', 1)[0]
+    cfx_filename = case_parent / f'{case_name}.cfx'
+    run_session_file('res2cfx.pres', {'__cfx_filename__': str(cfx_filename),
+                                      '__res_filename__': str(cfx_filename)})
+
+
 class CFXResFile:
     """Class wrapped around the *.res case file"""
 
@@ -50,6 +60,10 @@ class CFXResFile:
 
     def __repr__(self):
         return f'<CFXResFile name={self.name}>'
+
+    def write_cfx_file(self):
+        """create the cfx file corresponding to this res file"""
+        return res2cfx(self.filename)
 
     def unlink(self):
         """delete the .res and .out file"""

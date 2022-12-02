@@ -5,7 +5,7 @@ import pathlib
 import shutil
 import subprocess
 import tempfile
-from typing import Union
+from typing import Union, Dict
 
 from .utils import change_suffix, ansys_version_from_inst_dir
 from .. import CFX_DOTENV_FILENAME
@@ -164,5 +164,15 @@ def play_session(session_file: PATHLIKE,
 
     cmd = f'"{_cfx5path}" -batch "{session_file}"'
 
-    subprocess.run(cmd, shell=True)
+    success = subprocess.run(cmd, shell=True, capture_output=True)
+    if success.returncode != 1:
+        print(f'subprocess was not successful: {success}')
     return cmd
+
+
+def run_session_file(session_filename, param_keywords: Dict) -> None:
+    """calls the session file and replaces the key words in param_keywords"""
+    tmp_session_file = copy_session_file_to_tmp(session_filename)
+    for k, v in param_keywords.items():
+        replace_in_file(tmp_session_file, k, v)
+    play_session(tmp_session_file)
