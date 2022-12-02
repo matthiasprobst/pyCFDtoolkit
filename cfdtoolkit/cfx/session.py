@@ -170,8 +170,12 @@ def play_session(session_file: PATHLIKE,
     return cmd
 
 
-def run_session_file(session_filename, param_keywords: Dict) -> None:
+def run_session_file(session_filename: Union[str, pathlib.Path],
+                     param_keywords: Dict) -> None:
     """calls the session file and replaces the key words in param_keywords"""
+    if not pathlib.Path(session_filename).exists():
+        # try finding it in SESSIONS_DIR:
+        session_filename = (SESSIONS_DIR / session_filename).resolve().absolute()
     tmp_session_file = copy_session_file_to_tmp(session_filename)
     for k, v in param_keywords.items():
         replace_in_file(tmp_session_file, k, v)

@@ -42,13 +42,14 @@ def _predict_new_res_filename(current_filename: PATHLIKE):
     return current_filename.parent.joinpath(f'{name_prefix}_{new_number:03d}.res')
 
 
-def res2cfx(cfx_filename):
-    _cfx_filename = pathlib.Path(cfx_filename)
-    case_parent = _cfx_filename.parent
-    case_name = _cfx_filename.stem.rsplit('_', 1)[0]
+def res2cfx(res_filename):
+    _res_filename = pathlib.Path(res_filename)
+    case_parent = _res_filename.parent
+    case_name = _res_filename.stem.rsplit('_', 1)[0]
     cfx_filename = case_parent / f'{case_name}.cfx'
-    run_session_file('res2cfx.pres', {'__cfx_filename__': str(cfx_filename),
-                                      '__res_filename__': str(cfx_filename)})
+    run_session_file('res2cfx.pre', {'__resfilename__': str(res_filename),
+                                     '__cfxfilename__': str(cfx_filename)})
+    return cfx_filename
 
 
 class CFXResFile:

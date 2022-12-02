@@ -7,6 +7,7 @@ from os import environ
 from pathlib import Path
 
 from .case import CFXCase
+from .result import CFXResFile
 
 
 def ansys_version_from_inst_dir(instdir: pathlib.Path) -> str:
