@@ -1,6 +1,7 @@
 import logging
 import os
 import pathlib
+import shutil
 from typing import List
 
 import dotenv
@@ -31,7 +32,7 @@ def update_case(func, *args, **kwargs):
 class CFXCase(CFXFile):
     """Class wrapped around the *.cfx case file.
 
-    Case assumtions:
+    Case assumptions:
     ----------------
     The case file (.cfx) and the definition file ('.def') have the same stem, e.g.:
     `mycase.cfx` and `mycase.def`.
@@ -57,16 +58,20 @@ class CFXCase(CFXFile):
         return len(self.res_files)
 
     @update_case
-    def reset(self):
+    def reset(self, include_def:bool=False):
         """Deletes all result files and the definition file, so that only the .cfx file
         remains (or if this does not exist, the def file should remain)"""
         if not self.filename.exists():
             raise FileExistsError('Cannot delete the case because no .cfx file would remain for this case.')
         for r in self.res_files:
+            trn_dir = r.parent / r.stem
+            if trn_dir.exists():
+                shutil.rmtree(trn_dir)
             r.unlink()
         if self.def_filename is not None:
-            if self.def_filename.exists():
-                self.def_filename.unlink()
+            if include_def:
+                if self.def_filename.exists():
+                    self.def_filename.unlink()
             hdf_filename = change_suffix(self.filename, '.hdf')
             if hdf_filename.exists():
                 hdf_filename.unlink()
