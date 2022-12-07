@@ -13,7 +13,8 @@ from .utils import change_suffix
 class CFXSolve(CFXExe):
     """cfx5solve interface class"""
 
-    def _generate_cmd(self, nproc: int, ini_filename: pathlib.Path, timeout_s: int):
+    def _generate_cmd(self, nproc: int, ini_filename: pathlib.Path, timeout_s: int,
+                      discard_run_history: bool):
         """generate the console command"""
         if not self.filename.exists():
             raise FileNotFoundError(f'Definition file not found: {self.filename.resolve().absolute()}')
@@ -22,7 +23,10 @@ class CFXSolve(CFXExe):
         cmd = f'"{exe}" -def "{self.filename}"'
 
         if ini_filename is not None:
-            cmd += f' -ini "{ini_filename}"'
+            if discard_run_history:
+                cmd += f' -ini-file "{ini_filename}"'
+            else:
+                cmd += f' -ini "{ini_filename}"'
 
         cmd += f' -chdir "{self.filename.parent}"'
 
@@ -40,7 +44,9 @@ class CFXSolve(CFXExe):
 
     def run(self, nproc: int,
             ini_filename: Union[pathlib.Path, res.CFXResFile] = None,
-            timeout_s: int = None, **kwargs):
+            timeout_s: int = None,
+            discard_run_history:bool=True,
+            **kwargs):
         """Run the solver"""
         if ini_filename is None:
             existing_res_files = list(self.filename.parent.glob(f'{self.filename.stem}*.res'))
@@ -52,7 +58,7 @@ class CFXSolve(CFXExe):
         if isinstance(ini_filename, res.CFXResFile):
             ini_filename = ini_filename.filename
 
-        cmd = self._generate_cmd(nproc, ini_filename, timeout_s=timeout_s)
+        cmd = self._generate_cmd(nproc, ini_filename, timeout_s=timeout_s, discard_run_history=discard_run_history)
         if kwargs.get('verbose', False):
             print(cmd)
         return subprocess.run(cmd, shell=True)
