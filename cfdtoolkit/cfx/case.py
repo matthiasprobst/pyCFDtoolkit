@@ -64,7 +64,7 @@ class CFXCase(CFXFile):
         if not self.filename.exists():
             raise FileExistsError('Cannot delete the case because no .cfx file would remain for this case.')
         for r in self.res_files:
-            trn_dir = r.parent / r.stem
+            trn_dir = r.filename.parent / r.filename.stem
             if trn_dir.exists():
                 shutil.rmtree(trn_dir)
             r.unlink()
