@@ -577,7 +577,7 @@ class CCLHDFFlowGroup(CCLHDFGroup):
                 return h5[self.path]['SOLVER CONTROL/CONVERGENCE CONTROL'].attrs['Minimum Number of Coefficient Loops']
 
     @min_iterations.setter
-    def max_iterations(self, min_iter):
+    def min_iterations(self, min_iter):
         """Sets the maximum iterations for steady state or the max iterations per time step of a transient run"""
         with h5py.File(self.filename, 'r+') as h5:
             if 'Minimum Number of Iterations' in h5[self.path]['SOLVER CONTROL/CONVERGENCE CONTROL']:

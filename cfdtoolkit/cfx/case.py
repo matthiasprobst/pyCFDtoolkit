@@ -129,8 +129,8 @@ class CFXCase(CFXFile):
     @update_case
     def rename(self, new_name: str) -> None:
         """renames all files of this case to the new name if still available (no conflict with existing files
-        in the working direcotry.
-        If succesful, it returns a new instance"""
+        in the working directory.
+        If successful, it returns a new instance"""
         if new_name.endswith('.cfx'):
             new_name = new_name.rsplit('.cfx')[0]
         new_filename = self.working_dir.joinpath(f'{new_name}.cfx').resolve()
