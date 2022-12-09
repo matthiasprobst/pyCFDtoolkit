@@ -1,5 +1,6 @@
 import pathlib
 import subprocess
+import warnings
 from dataclasses import dataclass
 from typing import Union
 
@@ -32,8 +33,11 @@ class CFXSolve(CFXExe):
 
         if nproc > 1:
             if nproc > NPROC_MAX:
-                raise ValueError(f'The selected number of processors ({nproc}) must '
-                                 f'not exceed the number of physical cores ({NPROC_MAX}).')
+                warnings.warn(f'The selected number of processors ({nproc}) must '
+                              f'not exceed the number of physical cores ({NPROC_MAX}). '
+                              f'It is adjusted to {NPROC_MAX}',
+                              UserWarning)
+                nproc = NPROC_MAX
             cmd += f' -par-local -partition {int(nproc)} -batch'
 
         if timeout_s is not None:
@@ -42,12 +46,17 @@ class CFXSolve(CFXExe):
             cmd += f' -maxet \"{int(timeout_s)} [s]\"'  # e.g. maxet='10 [min]'
         return cmd
 
-    def run(self, nproc: int,
+    def run(self, nproc: Union[int, None],
             ini_filename: Union[pathlib.Path, res.CFXResFile] = None,
             timeout_s: int = None,
             discard_run_history:bool=True,
             **kwargs):
         """Run the solver"""
+        if nproc is None:
+            warnings.warn('No number of processors was given. Taking the maximum available. '
+                          'Make sure this is a good choice or that no other processes are using the '
+                          'CPU!', UserWarning)
+            nproc = NPROC_MAX
         if ini_filename is None:
             existing_res_files = list(self.filename.parent.glob(f'{self.filename.stem}*.res'))
             if len(existing_res_files) > 0:

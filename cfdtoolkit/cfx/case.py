@@ -39,10 +39,15 @@ class CFXCase(CFXFile):
     The result files (.res) will look like `mycase_001.res` and `maycase_002.res` and so on.
     """
 
-    def __init__(self, filename):
+    def __init__(self, filename: pathlib.Path):
         """
         Avoids error when multiple cfx files are available in
         one folder, e.g. *._frz, *_trn.cfx
+
+        Parameters
+        ----------
+        filename: pathlib.Path
+            ANSYS CFX case filename (*.cfx)
         """
         super().__init__(filename)
         if not self.filename.exists():

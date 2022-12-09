@@ -394,6 +394,11 @@ class CCLHDFGroup:
             else:
                 raise KeyError(f'{item} not found in {self.path}')
 
+    def keys(self) -> List[str]:
+        with h5py.File(self.filename) as h5:
+            keys = list(h5[self.path].keys())
+        return keys
+
     @property
     def parent(self):
         if self.path == '/':
@@ -535,12 +540,23 @@ class CCLHDFDomainGroup(CCLHDFGroup):
 class CCLHDFFlowGroup(CCLHDFGroup):
 
     @property
+    def output_control(self):
+        with h5py.File(self.filename, 'r') as h5:
+            root = h5[self.path]
+            if 'OUTPUT CONTROL' not in root:
+                output_control_grp = root.create_group('OUTPUT CONTROL')
+                for k in ('MONITOR OBJECTS', 'MONITOR FORCES', 'MONITOR PARTICLES'):
+                    g = output_control_grp.create_group(k)
+                    g.attrs['Option'] = 'Full'
+        return CCLHDFFlowGroup(filename=self.filename, path=self.path + '/OUTPUT CONTROL')
+
+    @property
     def domains(self):
         """returns domain groups"""
         return _list_of_instances_by_keyword_substring(self.filename, self.path, 'DOMAIN: ', CCLHDFDomainGroup)
 
     def get_boundary_type(self, bdry_type: str, squeeze: bool = True) -> Union[CCLHDFBoundary, List[CCLHDFBoundary]]:
-        """Filters for a specific boundary type. Walks thorugh all domains
+        """Filters for a specific boundary type. Walks through all domains
 
         Parameters
         ---------
@@ -548,7 +564,7 @@ class CCLHDFFlowGroup(CCLHDFGroup):
             Name of the boundary type, e.g. 'inlet'
         squeeze: bool, optional=True
             Whether to return a CCLHDFBoundary instance if only one boundary was found instead of
-            returnig a list of only one item.
+            returning a list of only one item.
 
         Returns
         -------
