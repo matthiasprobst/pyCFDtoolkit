@@ -49,7 +49,7 @@ class CFXSolve(CFXExe):
     def run(self, nproc: Union[int, None],
             ini_filename: Union[pathlib.Path, res.CFXResFile] = None,
             timeout_s: int = None,
-            discard_run_history:bool=True,
+            discard_run_history:bool=False,
             **kwargs):
         """Run the solver"""
         if nproc is None:
