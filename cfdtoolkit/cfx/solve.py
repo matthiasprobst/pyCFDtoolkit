@@ -46,17 +46,17 @@ class CFXSolve(CFXExe):
             cmd += f' -maxet \"{int(timeout_s)} [s]\"'  # e.g. maxet='10 [min]'
         return cmd
 
-    def run(self, nproc: Union[int, None],
+    def run(self, nproc: Union[int, str],
             ini_filename: Union[pathlib.Path, res.CFXResFile] = None,
             timeout_s: int = None,
-            discard_run_history:bool=False,
+            discard_run_history: bool = False,
             **kwargs):
         """Run the solver"""
-        if nproc is None:
-            warnings.warn('No number of processors was given. Taking the maximum available. '
-                          'Make sure this is a good choice or that no other processes are using the '
-                          'CPU!', UserWarning)
-            nproc = NPROC_MAX
+        if isinstance(nproc, str):
+            if nproc == 'max':
+                nproc = NPROC_MAX
+            else:
+                raise ValueError(f'Cannot interpret string value of "nproc": {nproc}')
         if ini_filename is None:
             existing_res_files = list(self.filename.parent.glob(f'{self.filename.stem}*.res'))
             if len(existing_res_files) > 0:
