@@ -21,7 +21,7 @@ CFX5SOLVE = os.environ.get("cfx5solve")
 
 
 def update_case(func, *args, **kwargs):
-    def decorator(_self):
+    def decorator(_self, *args, **kwargs):
         _self.update()
         func(_self, *args, **kwargs)
         _self.update()
@@ -63,7 +63,7 @@ class CFXCase(CFXFile):
         return len(self.res_files)
 
     @update_case
-    def reset(self, include_def:bool=False):
+    def reset(self, include_def: bool = False, verbose: bool = False):
         """Deletes all result files and the definition file, so that only the .cfx file
         remains (or if this does not exist, the def file should remain)"""
         if not self.filename.exists():
@@ -72,7 +72,17 @@ class CFXCase(CFXFile):
             trn_dir = r.filename.parent / r.filename.stem
             if trn_dir.exists():
                 shutil.rmtree(trn_dir)
+            if verbose:
+                print(f'rm {r}')
             r.unlink()
+        for f in self.filename.parent.glob(f'{self.filename.stem}*.out'):
+            if verbose:
+                print(f'rm {f}')
+            f.unlink()
+        for f in self.filename.parent.glob(f'{self.filename.stem}*.dir'):
+            if verbose:
+                print(f'rm {f}')
+            shutil.rmtree(f)
         if self.def_filename is not None:
             if include_def:
                 if self.def_filename.exists():
