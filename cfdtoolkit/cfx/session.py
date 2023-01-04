@@ -40,10 +40,12 @@ def importccl(cfx_filename: PATHLIKE, ccl_filename: Union[PATHLIKE, None] = None
                      {'__cfxfilename__': str(cfx_filename.absolute()),
                       '__cclfilename__': str(ccl_filename.absolute()),
                       '__version__': ansys_version})
+    os.utime(cfx_filename.absolute())
 
     # now check if .cfx file modification time has changed
     if cfx_filename.stat().st_mtime <= mtime_before:
-        raise ValueError('Failed importing ccl file')
+        raise ValueError('It seems that the cfx file has not been touched which was expected. '
+                         'Therefore failed importing ccl file')
     return cfx_filename
 
 
@@ -57,11 +59,13 @@ def cfx2def(cfx_filename: PATHLIKE, def_filename: Union[PATHLIKE, None] = None,
     else:
         def_filename = pathlib.Path(def_filename)
 
-    run_session_file(SESSIONS_DIR / 'cfx2def.pre',
-                     {'__cfxfilename__': str(cfx_filename.absolute()),
-                      '__deffilename__': str(def_filename.absolute()),
-                      '__version__': ansys_version})
-
+    logger.debug(f'Running session file cfx2def.pre to create def-file {def_filename} from cfx-file {cfx_filename}.')
+    completed_process = run_session_file(SESSIONS_DIR / 'cfx2def.pre',
+                                         {'__cfxfilename__': str(cfx_filename.absolute()),
+                                          '__deffilename__': str(def_filename.absolute()),
+                                          '__version__': ansys_version})
+    if not def_filename.exists():
+        raise RuntimeError(f'Something went wrong. The def file was not created. Process info: {completed_process}')
     return def_filename
 
 
@@ -136,7 +140,7 @@ def replace_in_file(filename, keyword, new_string):
 
 
 def play_session(session_file: PATHLIKE,
-                 cfx5pre: Union[PATHLIKE, None] = None) -> None:
+                 cfx5pre: Union[PATHLIKE, None] = None) -> subprocess.CompletedProcess:
     """
     Runs cfx5pre session file
 
@@ -158,14 +162,18 @@ def play_session(session_file: PATHLIKE,
 
     cmd = f'"{_cfx5path}" -batch "{session_file}"'
 
-    success = subprocess.run(cmd, shell=True, capture_output=True)
-    if success.returncode != 0:
-        print(f'subprocess was not successful: {success}')
-    return cmd
+    completed_process = subprocess.run(cmd, shell=True, capture_output=True)
+    logger.debug(f'subprocess info: {completed_process}')
+    if completed_process.returncode != 0:
+        if 'not connect to any license server' in completed_process.stdout:
+            raise ConnectionError(f'I seems that you are not connected to a license server: {completed_process}')
+        else:  # unknown error
+            raise RuntimeError(f'Subprocess was not successful: {completed_process}')
+    return completed_process
 
 
 def run_session_file(session_filename: Union[str, pathlib.Path],
-                     param_keywords: Dict) -> None:
+                     param_keywords: Dict) -> subprocess.CompletedProcess:
     """calls the session file and replaces the key words in param_keywords"""
     if not pathlib.Path(session_filename).exists():
         # try finding it in SESSIONS_DIR:
@@ -173,4 +181,4 @@ def run_session_file(session_filename: Union[str, pathlib.Path],
     tmp_session_file = copy_session_file_to_tmp(session_filename)
     for k, v in param_keywords.items():
         replace_in_file(tmp_session_file, k, v)
-    play_session(tmp_session_file)
+    return play_session(tmp_session_file)

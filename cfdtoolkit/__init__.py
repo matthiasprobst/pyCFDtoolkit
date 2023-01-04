@@ -39,18 +39,18 @@ def _make_sessions_dir():
         SESSIONS_DIR.mkdir()
 
 
-def _write_dot_env_file(inst_dir, overwrite=False):
+def _write_dot_env_file(installation_directory, overwrite=False):
     """creates the .env file for cfx environment variables"""
     if not overwrite and CFX_DOTENV_FILENAME.exists():
         raise FileExistsError('cfx.env file already exists in user directory')
 
     with open(CFX_DOTENV_FILENAME, 'w') as f:
-        f.write(f'cfx5instdir = {inst_dir}\n')  # C:\Program Files\ANSYS Inc\v202\CFX\bin
-        f.write(f'cfx5pre = {inst_dir}/bincfx5pre\n')
-        f.write(f'cfx5solve = {inst_dir}/bincfx5solve\n')
-        f.write(f'cfx5stop = {inst_dir}/bincfx5stop\n')
-        f.write(f'cfx5cmds = {inst_dir}/bincfx5cmds\n')
-        f.write(f'cfx5mondata = {inst_dir}/bincfx5mondata')
+        f.write(f'cfx5instdir = {installation_directory}\n')  # C:\Program Files\ANSYS Inc\v202\CFX\bin
+        f.write(f'cfx5pre = {installation_directory}/bincfx5pre\n')
+        f.write(f'cfx5solve = {installation_directory}/bincfx5solve\n')
+        f.write(f'cfx5stop = {installation_directory}/bincfx5stop\n')
+        f.write(f'cfx5cmds = {installation_directory}/bincfx5cmds\n')
+        f.write(f'cfx5mondata = {installation_directory}/bincfx5mondata')
 
 
 from .cfx import CFXCase

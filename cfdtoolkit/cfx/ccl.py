@@ -841,26 +841,26 @@ def generate(input_file: PATHLIKE, ccl_filename: Union[PATHLIKE, None] = None,
     return _generate_from_def(input_file, ccl_filename, overwrite)
 
 
-def _generate_from_res_or_cfx(res_cfx_filename: PATHLIKE,
-                              ccl_filename: pathlib.Path, cfx5pre: str, overwrite=True) -> pathlib.Path:
-    if overwrite and ccl_filename.exists():
-        ccl_filename.unlink()
-    if res_cfx_filename.suffix == '.cfx':
-        session_filename = os.path.join(SESSIONS_DIR, 'cfx2ccl.pre')
-    elif res_cfx_filename.suffix == '.res':
-        session_filename = os.path.join(SESSIONS_DIR, 'res2ccl.pre')
-    else:
-        raise ValueError(f'Could not determine "session_filename"')
-
-    random_fpath = session.copy_session_file_to_tmp(session_filename)
-    _upper_ext = res_cfx_filename.suffix[1:].upper()
-    session.replace_in_file(random_fpath, f'__{_upper_ext}_FILE__', res_cfx_filename)
-    session.replace_in_file(random_fpath, '__CCL_FILE__', ccl_filename)
-
-    logger.debug(f'Playing CFX session file: {random_fpath}')
-    session.play_session(random_fpath, cfx5pre)
-    os.remove(random_fpath)
-    return ccl_filename
+# def _generate_from_res_or_cfx(res_cfx_filename: PATHLIKE,
+#                               ccl_filename: pathlib.Path, cfx5pre: str, overwrite=True) -> pathlib.Path:
+#     if overwrite and ccl_filename.exists():
+#         ccl_filename.unlink()
+#     if res_cfx_filename.suffix == '.cfx':
+#         session_filename = os.path.join(SESSIONS_DIR, 'cfx2ccl.pre')
+#     elif res_cfx_filename.suffix == '.res':
+#         session_filename = os.path.join(SESSIONS_DIR, 'res2ccl.pre')
+#     else:
+#         raise ValueError(f'Could not determine "session_filename"')
+#
+#     random_fpath = session.copy_session_file_to_tmp(session_filename)
+#     _upper_ext = res_cfx_filename.suffix[1:].upper()
+#     session.replace_in_file(random_fpath, f'__{_upper_ext}_FILE__', res_cfx_filename)
+#     session.replace_in_file(random_fpath, '__CCL_FILE__', ccl_filename)
+#
+#     logger.debug(f'Playing CFX session file: {random_fpath}')
+#     session.play_session(random_fpath, cfx5pre)
+#     os.remove(random_fpath)
+#     return ccl_filename
 
 
 def _generate_from_def(def_filename: PATHLIKE,

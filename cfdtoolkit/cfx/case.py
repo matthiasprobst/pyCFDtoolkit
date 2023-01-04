@@ -2,6 +2,7 @@ import logging
 import os
 import pathlib
 import shutil
+import warnings
 from typing import List
 
 import dotenv
@@ -51,7 +52,8 @@ class CFXCase(CFXFile):
         """
         super().__init__(filename)
         if not self.filename.exists():
-            raise FileExistsError(f'CFX file does not exist: {self.filename}')
+            warnings.warn(f'CFX file does not exist: {self.filename}. Still the class is initialized. '
+                          'You may have only limited funcitonality!')
         if self.filename.suffix != '.cfx':
             raise ValueError(f'Not a cfx case file. Expecting suffix ".cfx" but found "{self.filename.suffix}"')
         self.res_files = []
@@ -66,8 +68,6 @@ class CFXCase(CFXFile):
     def reset(self, include_def: bool = False, verbose: bool = False):
         """Deletes all result files and the definition file, so that only the .cfx file
         remains (or if this does not exist, the def file should remain)"""
-        if not self.filename.exists():
-            raise FileExistsError('Cannot delete the case because no .cfx file would remain for this case.')
         for r in self.res_files:
             trn_dir = r.filename.parent / r.filename.stem
             if trn_dir.exists():
@@ -75,14 +75,16 @@ class CFXCase(CFXFile):
             if verbose:
                 print(f'rm {r}')
             r.unlink()
-        for f in self.filename.parent.glob(f'{self.filename.stem}*.out'):
-            if verbose:
-                print(f'rm {f}')
-            f.unlink()
-        for f in self.filename.parent.glob(f'{self.filename.stem}*.dir'):
-            if verbose:
-                print(f'rm {f}')
-            shutil.rmtree(f)
+
+        for _suffix in ('*.out', '*.dir', '*.ccl'):
+            for f in self.filename.parent.glob(f'{self.filename.stem}*.out'):
+                if verbose:
+                    print(f'rm {f}')
+                if f.is_file():
+                    f.unlink()
+                else:
+                    shutil.rmtree(f)
+
         if self.def_filename is not None:
             if include_def:
                 if self.def_filename.exists():
