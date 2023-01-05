@@ -8,7 +8,8 @@ from typing import Union, Dict
 
 import dotenv
 
-from .utils import change_suffix, ansys_version_from_inst_dir
+from .utils import change_suffix
+from .installation import ansys_version_from_inst_dir
 from .. import CFX_DOTENV_FILENAME
 from .. import SESSIONS_DIR
 from ..typing import PATHLIKE

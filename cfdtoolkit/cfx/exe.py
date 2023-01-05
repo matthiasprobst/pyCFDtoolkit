@@ -4,7 +4,7 @@ import pathlib
 import psutil
 from dataclasses import dataclass
 
-from .utils import ansys_version_from_inst_dir
+from .installation import ansys_version_from_inst_dir
 
 NPROC_MAX = psutil.cpu_count(logical=False)
 

@@ -36,11 +36,3 @@ def capitalize_phrase(phrase: str) -> str:
     """Returns the phrase where every first letter of a word is capitalized"""
     return ' '.join([s.capitalize() for s in phrase.split(' ')])
 
-
-def ansys_version_from_inst_dir(instdir: pathlib.Path) -> str:
-    instdir = pathlib.Path(instdir)
-    p = re.compile('v[0-9][0-9][0-9]')
-
-    for part in instdir.parts:
-        if p.match(part) is not None:
-            return f'{part[1:3]}.{part[-1]}'

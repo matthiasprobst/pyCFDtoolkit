@@ -7,7 +7,7 @@ from typing import Union, List
 
 import dotenv
 
-from . import CFXInstallation
+from .installation import CFXInstallation
 from . import solve
 from .core import OutFile, MonitorData
 from .session import run_session_file
@@ -48,11 +48,11 @@ def _predict_new_res_filename(current_filename: PATHLIKE):
 
 def res2cfx(res_filename):
     _res_filename = pathlib.Path(res_filename)
+    if not _res_filename.exists():
+        raise FileNotFoundError(f'Result file "{res_filename}" not found.')
     case_parent = _res_filename.parent
     case_name = _res_filename.stem.rsplit('_', 1)[0]
     cfx_filename = case_parent / f'{case_name}.cfx'
-    if not res_filename.exists():
-        raise FileNotFoundError(f'Result file "{res_filename}" not found.')
     run_session_file('res2cfx.pre', {'__version__': cfxinst.version,
                                      '__resfilename__': str(res_filename),
                                      '__cfxfilename__': str(cfx_filename)})
