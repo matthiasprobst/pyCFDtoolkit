@@ -7,12 +7,15 @@ from typing import Union, List
 
 import dotenv
 
+from . import CFXInstallation
 from . import solve
 from .core import OutFile, MonitorData
 from .session import run_session_file
 from .utils import change_suffix, touch_stp
 from .. import CFX_DOTENV_FILENAME
 from ..typing import PATHLIKE
+
+cfxinst = CFXInstallation()
 
 dotenv.load_dotenv(CFX_DOTENV_FILENAME)
 
@@ -48,7 +51,9 @@ def res2cfx(res_filename):
     case_parent = _res_filename.parent
     case_name = _res_filename.stem.rsplit('_', 1)[0]
     cfx_filename = case_parent / f'{case_name}.cfx'
-    run_session_file('res2cfx.pre', {'__version__': str(res_filename),
+    if not res_filename.exists():
+        raise FileNotFoundError(f'Result file "{res_filename}" not found.')
+    run_session_file('res2cfx.pre', {'__version__': cfxinst.version,
                                      '__resfilename__': str(res_filename),
                                      '__cfxfilename__': str(cfx_filename)})
     return cfx_filename
