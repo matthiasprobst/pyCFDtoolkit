@@ -15,7 +15,7 @@ class CFXSolve(CFXExe):
     """cfx5solve interface class"""
 
     def _generate_cmd(self, nproc: int, ini_filename: pathlib.Path, timeout_s: int,
-                      discard_run_history: bool):
+                      discard_run_history: bool, max_nproc_check: bool=True):
         """generate the console command"""
         if not self.filename.exists():
             raise FileNotFoundError(f'Definition file not found: {self.filename.resolve().absolute()}')
@@ -32,7 +32,7 @@ class CFXSolve(CFXExe):
         cmd += f' -chdir "{self.filename.parent}"'
 
         if nproc > 1:
-            if nproc > NPROC_MAX:
+            if nproc > NPROC_MAX and max_nproc_check:
                 warnings.warn(f'The selected number of processors ({nproc}) must '
                               f'not exceed the number of physical cores ({NPROC_MAX}). '
                               f'It is adjusted to {NPROC_MAX}',
@@ -52,6 +52,7 @@ class CFXSolve(CFXExe):
             discard_run_history: bool = False,
             **kwargs):
         """Run the solver"""
+        max_nproc_check = kwargs.pop('max_nproc_check', True)
         if isinstance(nproc, str):
             if nproc == 'max':
                 nproc = NPROC_MAX
@@ -67,7 +68,10 @@ class CFXSolve(CFXExe):
         if isinstance(ini_filename, res.CFXResFile):
             ini_filename = ini_filename.filename
 
-        cmd = self._generate_cmd(nproc, ini_filename, timeout_s=timeout_s, discard_run_history=discard_run_history)
+        cmd = self._generate_cmd(nproc, ini_filename,
+                                 timeout_s=timeout_s,
+                                 discard_run_history=discard_run_history,
+                                 max_nproc_check=max_nproc_check)
         if kwargs.get('verbose', False):
             print(cmd)
         return subprocess.run(cmd, shell=True)
