@@ -1,9 +1,15 @@
+"""Significance module.
+Running mean and std are used to evaluate statistical significance of a
+quantity.
+"""
+
 import numpy as np
 
 
 def _transpose_and_reshape_input(x, axis):
     return x.transpose([axis, *[ax for ax in range(x.ndim) if ax != axis]]).reshape(
         (x.shape[axis], x.size // x.shape[axis]))
+
 
 def _transpose_and_reshape_back_to_original(x, orig_shape, axis):
     ndim = len(orig_shape)
@@ -32,7 +38,9 @@ def next_mean(mu, n_mu, new_val):
     """
     return (mu * n_mu + new_val) / (n_mu + 1)
 
+
 def running_mean(x: np.ndarray, axis=0):
+    """Computes the running mean of an array along a given axis"""
     if axis == -1:
         axis = x.ndim
     _x = _transpose_and_reshape_input(x, axis)
