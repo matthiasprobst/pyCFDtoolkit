@@ -256,7 +256,7 @@ class CCLTextFile:
     def to_hdf(self, hdf_filename: Union[PATHLIKE, None] = None, overwrite=True) -> pathlib.Path:
         """Write ccl content to HDF5"""
         if hdf_filename is None:
-            hdf_filename = change_suffix(self.filename, '.hdf')
+            hdf_filename = change_suffix(self.filename, CCLFile.SUFFIX)
         else:
             hdf_filename = pathlib.Path(hdf_filename)
 
@@ -448,7 +448,9 @@ class CCLHDFBoundary(CCLHDFGroup):
     @property
     def condition(self):
         """Returns the boundary condition group of the boundary"""
-        return _list_of_instances_by_keyword_substring(self.filename, self.path, 'BOUNDARY CONDITIONS',
+        return _list_of_instances_by_keyword_substring(self.filename,
+                                                       self.path,
+                                                       'BOUNDARY CONDITIONS',
                                                        CCLHDFBoundaryCondition)[0]
 
     @condition.setter
@@ -727,18 +729,20 @@ class CCLHDFFlowGroup(CCLHDFGroup):
 class CCLFile:
     """Interface class to the HDF file containing CCL data"""
 
-    def __init__(self, filename: PATHLIKE, aux_dir: PATHLIKE = None):
+    SUFFIX = '.ccl_hdf'
+
+    def __init__(self, filename: PATHLIKE, aux_dir: PATHLIKE = None, take_existing:bool =True):
         """
         Note: if the cfx file is younger than the ccl file, the ccl file will be rewritten
         from the cfx file! All data in the existing ccl hdf file will be overwritten.
         """
         # logger.debug('reading ccl')
         filename = pathlib.Path(filename)
-        if filename.suffix in ('.hdf', '.hdf'):
+        if filename.suffix == self.SUFFIX:
             self.filename = filename
             self.aux_dir = filename.parent
         elif filename.suffix == '.ccl':
-            _hdf_fname = change_suffix(filename, '.hdf')
+            _hdf_fname = change_suffix(filename, self.SUFFIX)
             if aux_dir is not None:
                 self.aux_dir = aux_dir
                 _hdf_fname = _hdf_fname.parent.joinpath(self.aux_dir).joinpath(_hdf_fname.name)
@@ -749,7 +753,11 @@ class CCLFile:
             if aux_dir is not None:
                 self.aux_dir = aux_dir
                 _ccl_fname = _ccl_fname.parent.joinpath(self.aux_dir).joinpath(_ccl_fname.name)
-            _hdf_fname = change_suffix(_ccl_fname, '.hdf')
+            _hdf_fname = change_suffix(_ccl_fname, self.SUFFIX)
+            if _hdf_fname.exists() and take_existing:
+                logger.info('Found existing ccl.hdf-file. In case the cfx file has changed in the meantime, '
+                            'changes are likely to be lost. You may regenerate the ccl.hdf-file ')
+                self.filename = _hdf_fname
             self.filename = CCLTextFile(generate(filename, ccl_filename=_ccl_fname)).to_hdf(_hdf_fname)
 
         else:
@@ -778,7 +786,7 @@ class CCLFile:
 
     @property
     def flow(self) -> List[CCLHDFFlowGroup]:
-        """Returns a list of groups starting wiht 'FLOW: '"""
+        """Returns a list of groups starting with 'FLOW: '"""
         return _list_of_instances_by_keyword_substring(self.filename, '/', 'FLOW: ', CCLHDFFlowGroup)
 
     @property

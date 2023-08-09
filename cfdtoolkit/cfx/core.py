@@ -165,8 +165,13 @@ class OutFile:
             raise FileNotFoundError(f'File not found: {self.filename}')
         return extract_out_data(self.filename)
 
-    def get_mesh_info(self) -> pd.DataFrame:
+    def get_mesh_info(self) -> Dict:
         """Return mesh info as pd.DataFrame"""
+        warnings.warn('Use "get_mesh_nodes()" instead.', DeprecationWarning)
+        return self.get_mesh_nodes()
+
+    def get_mesh_nodes(self) -> Dict:
+        """Return the number of nodes per domain"""
         if not self.filename.exists():
             raise FileNotFoundError(f'File not found: {self.filename}')
         return mesh_info_from_file(self.filename)

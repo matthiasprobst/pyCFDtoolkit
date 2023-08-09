@@ -1,8 +1,7 @@
+import h5py
 import pathlib
 from dataclasses import dataclass
 from typing import Dict
-
-import h5py
 
 from . import CFXBoundaryCondition
 from . import axis, flowdir
@@ -10,7 +9,7 @@ from ...typing import PATHLIKE
 
 
 class InletBoundaryCondition(CFXBoundaryCondition):
-    boundary_type: str = 'INLET'
+    boundary_name: str = 'INLET'
     content_dict: Dict = {}
 
     def write(self, hdf_filename: PATHLIKE, bdry_h5_path: str) -> None:
@@ -20,24 +19,25 @@ class InletBoundaryCondition(CFXBoundaryCondition):
         assert boundary_ccl_name == 'BOUNDARY'
 
         with h5py.File(hdf_filename, 'r+') as h5:
-            h5[bdry_h5_path].attrs['BOUNDARY TYPE'] = self.boundary_type
+            h5[bdry_h5_path].attrs['Boundary Type'] = self.boundary_name
 
-            print(f'deleting {bdry_h5_path}/BOUNDARY CONDITIONS')
+            # print(f'deleting {bdry_h5_path}/BOUNDARY CONDITIONS')
             del h5[f'{bdry_h5_path}/BOUNDARY CONDITIONS']
 
             bdry_cond_grp = h5[bdry_h5_path].create_group('BOUNDARY CONDITIONS')
-            print(f'create grp: {bdry_cond_grp.name}')
+
+            # print(f'create grp: {bdry_cond_grp.name}')
 
             def _write_group(_grp, _dict):
                 for k, v in _dict.items():
                     if isinstance(v, dict):
                         subgrp = _grp.create_group(k)
-                        print(f'creating group {subgrp.name}')
-                        print(str(v))
+                        # print(f'creating group {subgrp.name}')
+                        # print(str(v))
                         _write_group(subgrp, v)
                     else:
                         _grp.attrs[k] = v
-                        print(f'creating attrs [{_grp.name}] {k}: {v}')
+                        # print(f'creating attrs [{_grp.name}] {k}: {v}')
 
             _write_group(bdry_cond_grp, self.content_dict)
 
@@ -53,7 +53,7 @@ class MassFlowInlet(InletBoundaryCondition):
     mass_flow_rate: float
     flow_direction: flowdir.FlowDirection
     mass_flow_rate_area: str = 'As Specified'  # "As Specified" or  "Total for All Sectors"
-    boundary_type: str = 'INLET'
+    boundary_name: str = 'INLET'
     content_dict = {}
 
     def __post_init__(self):
@@ -97,12 +97,14 @@ class NormalSpeed(InletBoundaryCondition):
     """Normal Speed inlet condition. Note, if turbulent, turbulence must be set"""
     normal_speed: float
     flow_regime: str = 'Subsonic'
-    boundary_type: str = 'INLET'
+    boundary_name: str = 'INLET'
+    turbulence: str = 'Medium Intensity and Eddy Viscosity Ratio'
 
     def __post_init__(self):
         self.content_dict = {'FLOW REGIME': {'Option': self.flow_regime.capitalize()},
                              'MASS AND MOMENTUM': {'Normal Speed': f'{self.normal_speed} [m s^-1]',
-                                                   'Option': 'Normal Speed'}}
+                                                   'Option': 'Normal Speed'},
+                             'TURBULENCE': {'Option': self.turbulence}}
 
     def __repr__(self):
         return f'NormalSpeed (Inlet Boundary Condition)\n  normalspeed={self.normal_speed}' \

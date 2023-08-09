@@ -72,5 +72,6 @@ class CFXPre(CFXExe):
         ccl_filename = pathlib.Path(ccl_filename)
         if not ccl_filename.exists():
             raise FileNotFoundError(f'CCL file not found: {ccl_filename}')
-        cfx_filename = importccl(change_suffix(ccl_filename, '.cfx'), ccl_filename)
+        cfx_filename = importccl(cfx_filename=change_suffix(ccl_filename, new_suffix='.cfx'),
+                                 ccl_filename=ccl_filename)
         return CFXPre(cfx_filename, None)
