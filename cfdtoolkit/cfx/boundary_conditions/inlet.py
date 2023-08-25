@@ -1,7 +1,7 @@
 import h5py
 import pathlib
 from dataclasses import dataclass
-from typing import Dict
+from typing import Dict, Union
 
 from . import CFXBoundaryCondition
 from . import axis, flowdir
@@ -61,16 +61,16 @@ class MassFlowInlet(InletBoundaryCondition):
             raise ValueError(f'Mass flow rate area must be one of those two: '
                              f'"As Specified", "Total for All Sectors"')
         self.content_dict = {'FLOW REGIME': {'Option': self.flow_regime.capitalize()},
-                             'MASS AND MOMENTUM': {'Mass Flow rate': f'{self.mass_flow_rate} [kg s^-1]',
-                                                   'Mass Flow rate Area': self.mass_flow_rate_area},
+                             'MASS AND MOMENTUM': {'Mass Flow Rate': f'{self.mass_flow_rate} [kg s^-1]',
+                                                   'Mass Flow Rate Area': self.mass_flow_rate_area},
                              'FLOW DIRECTION': {'Option': self.flow_direction.option}
                              }
         if isinstance(self.flow_direction, flowdir.NormalToBoundary):
             pass
         elif isinstance(self.flow_direction, flowdir.CartesianComponents):
-            self.content_dict['FLOW DIRECTION'] = {'X Componen': self.flow_direction.xcomp,
-                                                   'Y Componen': self.flow_direction.ycomp,
-                                                   'Z Componen': self.flow_direction.zcomp}
+            self.content_dict['FLOW DIRECTION'] = {'X Component': self.flow_direction.xcomp,
+                                                   'Y Component': self.flow_direction.ycomp,
+                                                   'Z Component': self.flow_direction.zcomp}
         elif isinstance(self.flow_direction, flowdir.CylindricalComponents):
             self.content_dict['FLOW DIRECTION'] = {'Axial Component': self.flow_direction.axial_comp,
                                                    'Radial Component': self.flow_direction.radial_comp,
@@ -108,4 +108,37 @@ class NormalSpeed(InletBoundaryCondition):
 
     def __repr__(self):
         return f'NormalSpeed (Inlet Boundary Condition)\n  normalspeed={self.normal_speed}' \
+               f'\n  flow regime={self.flow_regime}'
+
+
+@dataclass
+class CartesianFromFile(InletBoundaryCondition):
+    """Normal Speed inlet condition. Note, if turbulent, turbulence must be set"""
+    u: Union[float, str]
+    v: Union[float, str]
+    w: Union[float, str]
+    flow_regime: str = 'Subsonic'
+    boundary_name: str = 'INLET'
+    turbulence: str = 'Medium Intensity and Eddy Viscosity Ratio'  # other: Low Intensity and Eddy Viscosity Ratio
+
+    def __post_init__(self):
+
+        if isinstance(u, float):
+            self.u = f'{self.u} [m s^-1]'
+        if isinstance(v, float):
+            self.v = f'{self.v} [m s^-1]'
+        if isinstance(w, float):
+            self.w = f'{self.w} [m s^-1]'
+
+        # if string, should be something like "inlet.Velocity in Stn Frame w(r)"
+
+        self.content_dict = {'FLOW REGIME': {'Option': self.flow_regime.capitalize()},
+                             'MASS AND MOMENTUM': {'U': f'{self.u}',
+                                                   'V': f'{self.v}',
+                                                   'W': f'{self.w}',
+                                                   'Option': 'Cartesian Velocity Components'},
+                             'TURBULENCE': {'Option': self.turbulence}}
+
+    def __repr__(self):
+        return f'CartesianFromFile (Inlet Boundary Condition)\n  u={self.u} v={self.v} w={self.w}' \
                f'\n  flow regime={self.flow_regime}'
