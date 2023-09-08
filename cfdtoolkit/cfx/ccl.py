@@ -1,22 +1,22 @@
+import dotenv
+import h5py
+import h5rdmtoolbox as h5tbx
 import logging
+import numpy as np
 import os
 import pathlib
 import shutil
 import subprocess
-from dataclasses import dataclass
-from typing import Union, List
-
-import dotenv
-import h5py
-import numpy as np
 from IPython.display import display, HTML
+from dataclasses import dataclass
+from typing import Dict
+from typing import List, Union
 
-from . import session
 from .boundary_conditions import CFXBoundaryCondition
 from .core import MonitorObject
 from .session import cfx2def
 from .utils import change_suffix
-from .. import CFX_DOTENV_FILENAME, SESSIONS_DIR
+from .. import CFX_DOTENV_FILENAME
 from .._html import h5file_html_repr
 from ..typing import PATHLIKE
 
@@ -256,7 +256,7 @@ class CCLTextFile:
     def to_hdf(self, hdf_filename: Union[PATHLIKE, None] = None, overwrite=True) -> pathlib.Path:
         """Write ccl content to HDF5"""
         if hdf_filename is None:
-            hdf_filename = change_suffix(self.filename, '.hdf')
+            hdf_filename = change_suffix(self.filename, CCLFile.SUFFIX)
         else:
             hdf_filename = pathlib.Path(hdf_filename)
 
@@ -305,20 +305,20 @@ class CCLTextFile:
         return indentation
 
 
-def _list_of_instances_by_keyword_substring(filename, root_group, substring, class_):
+def _list_of_instances_by_keyword_substring(filename, root_group, substring, cls):
     instances = []
     with h5py.File(filename) as h5:
         for k in h5[root_group].keys():
             if substring in k:
                 if root_group == '/':
-                    instances.append(class_(k, filename))
+                    instances.append(cls(k, filename))
                 else:
-                    instances.append(class_(f'{root_group}/{k}', filename))
+                    instances.append(cls(f'{root_group}/{k}', filename))
     return instances
 
 
 @dataclass
-class CCLHDFAttributWrapper:
+class CCLHDFAttributeWrapper:
     filename: PATHLIKE
     path: PATHLIKE
     values: dict
@@ -361,7 +361,7 @@ class CCLHDFGroup:
     def options(self):
         with h5py.File(self.filename) as h5:
             attr_dict = dict(h5[self.path].attrs.items())
-            return CCLHDFAttributWrapper(self.filename, self.path, attr_dict)
+            return CCLHDFAttributeWrapper(self.filename, self.path, attr_dict)
 
     def __repr__(self):
         return f'CCLHDFGroup {self.path} of file {self.filename}'
@@ -448,7 +448,9 @@ class CCLHDFBoundary(CCLHDFGroup):
     @property
     def condition(self):
         """Returns the boundary condition group of the boundary"""
-        return _list_of_instances_by_keyword_substring(self.filename, self.path, 'BOUNDARY CONDITIONS',
+        return _list_of_instances_by_keyword_substring(self.filename,
+                                                       self.path,
+                                                       'BOUNDARY CONDITIONS',
                                                        CCLHDFBoundaryCondition)[0]
 
     @condition.setter
@@ -535,6 +537,10 @@ class CCLHDFDomainGroup(CCLHDFGroup):
             if 'DOMAIN: ' in parent_path:
                 return CCLHDFDomainGroup(parent_path, self.filename)
             return CCLHDFGroup(parent_path, self.filename)
+
+
+class CCLHDFCELGroup(CCLHDFGroup):
+    pass
 
 
 class CCLHDFFlowGroup(CCLHDFGroup):
@@ -727,18 +733,20 @@ class CCLHDFFlowGroup(CCLHDFGroup):
 class CCLFile:
     """Interface class to the HDF file containing CCL data"""
 
-    def __init__(self, filename: PATHLIKE, aux_dir: PATHLIKE = None):
+    SUFFIX = '.ccl_hdf'
+
+    def __init__(self, filename: PATHLIKE, aux_dir: PATHLIKE = None, take_existing: bool = True):
         """
         Note: if the cfx file is younger than the ccl file, the ccl file will be rewritten
         from the cfx file! All data in the existing ccl hdf file will be overwritten.
         """
         # logger.debug('reading ccl')
         filename = pathlib.Path(filename)
-        if filename.suffix in ('.hdf', '.hdf'):
+        if filename.suffix == self.SUFFIX:
             self.filename = filename
             self.aux_dir = filename.parent
         elif filename.suffix == '.ccl':
-            _hdf_fname = change_suffix(filename, '.hdf')
+            _hdf_fname = change_suffix(filename, self.SUFFIX)
             if aux_dir is not None:
                 self.aux_dir = aux_dir
                 _hdf_fname = _hdf_fname.parent.joinpath(self.aux_dir).joinpath(_hdf_fname.name)
@@ -749,7 +757,11 @@ class CCLFile:
             if aux_dir is not None:
                 self.aux_dir = aux_dir
                 _ccl_fname = _ccl_fname.parent.joinpath(self.aux_dir).joinpath(_ccl_fname.name)
-            _hdf_fname = change_suffix(_ccl_fname, '.hdf')
+            _hdf_fname = change_suffix(_ccl_fname, self.SUFFIX)
+            if _hdf_fname.exists() and take_existing:
+                logger.info('Found existing ccl.hdf-file. In case the cfx file has changed in the meantime, '
+                            'changes are likely to be lost. You may regenerate the ccl.hdf-file ')
+                self.filename = _hdf_fname
             self.filename = CCLTextFile(generate(filename, ccl_filename=_ccl_fname)).to_hdf(_hdf_fname)
 
         else:
@@ -777,9 +789,15 @@ class CCLFile:
             return h5file_html_repr(h5['/'], 50)
 
     @property
+    def cel(self) -> CCLHDFCELGroup:
+        with h5tbx.File(self.filename) as h5:
+            return CCLHDFGroup(self.filename, h5.find_one({'$name': '/LIBRARY/CEL'}, '$group').name)
+
+    @property
     def flow(self) -> List[CCLHDFFlowGroup]:
-        """Returns a list of groups starting wiht 'FLOW: '"""
-        return _list_of_instances_by_keyword_substring(self.filename, '/', 'FLOW: ', CCLHDFFlowGroup)
+        """Returns a list of groups starting with 'FLOW: '"""
+        return _list_of_instances_by_keyword_substring(self.filename, root_group='/', substring='FLOW: ',
+                                                       cls=CCLHDFFlowGroup)
 
     @property
     def library(self) -> CCLHDFGroup:
@@ -796,6 +814,166 @@ class CCLFile:
         if ccl_filename is None:
             ccl_filename = change_suffix(self.filename, '.ccl')
         return hdf_to_ccl(self.filename, ccl_filename, intendation_step=INTENDATION_STEP)
+
+    def set_steady_state_max_iterations(self, max_iter: int):
+        """sets the maximum number of iterations for steady state run. Note: This assumes, that the file
+        is steady state! Is not checked!!!"""
+        with h5tbx.File(self.filename, 'r+') as h5:
+            convctrl_grp = h5['FLOW: Flow Analysis 1/SOLVER CONTROL/CONVERGENCE CONTROL']
+            convctrl_grp.attrs['Maximum Number of Iterations'] = str(int(max_iter))
+
+    def set_inlet_velocity_from_file(self, csv_filename):
+        """Sets the inlet velocity profile from a csv file
+        Note: Assumes that the csv file looks like this:
+
+        [Name]
+        inlet
+
+        [Spatial Fields]
+        r
+
+        [Data]
+        r [ m ], Velocity in Stn Frame w [ m s^-1 ]
+        0,-0.48499
+        0.00036633,-0.48498
+        0.00073265,-0.48497
+        0.001099,-0.48495
+        0.0014653,-0.48494
+        ...
+
+        """
+        with h5tbx.File(self.filename, 'r+') as h5:
+            cel_grp = h5.find_one({'$name': '/LIBRARY/CEL'}, '$group')
+            g = cel_grp.create_group('FUNCTION: inlet', overwrite=True)
+            g.attrs['Argument Units'] = '[m]'
+            g.attrs['Extend Max'] = 'true'
+            g.attrs['Extend Min'] = 'true'
+            g.attrs['Option'] = 'Profile Data'
+            g.attrs['Spatial Fields'] = 'r'
+
+            gdf = g.create_group('DATA FIELD: Velocity in Stn Frame w')
+            gdf.attrs['Field Name'] = 'Velocity in Stn Frame w'
+            gdf.attrs['Parameter List'] = 'Velocity Axial Component,W,Wall Velocity Axial Component,Wall W'
+            gdf.attrs['Result Units'] = 'm s^-1'
+
+            gds = g.create_group('DATA SOURCE')
+            gds.attrs['File Name'] = str(csv_filename)
+            gds.attrs['Option'] = 'From File'
+
+            bdry_grp = h5['FLOW: Flow Analysis 1'].find_one({'$basename': 'BOUNDARY: INLET'}, '$group')
+            bdry_grp.attrs['Use Profile Data'] = 'On'
+
+            g = bdry_grp.create_group('BOUNDARY CONDITIONS', overwrite=True)
+            g.create_group('FLOW REGIME', attrs={'Option': 'Subsonic'})
+            g.create_group('MASS AND MOMENTUM', attrs={'Option': 'Cartesian Velocity Components',
+                                                       'U': '0 [m s^-1]',
+                                                       'V': '0 [m s^-1]',
+                                                       'W': 'inlet.Velocity in Stn Frame w(r)',
+                                                       })
+            g.create_group('TURBULENCE', attrs={'Option': 'Low Intensity and Eddy Viscosity Ratio'})
+
+            bdry_grp.create_group('BOUNDARY PROFILE', attrs={'Profile Name': 'inlet'}, overwrite=True)
+
+    def set_expression(self, h5=None, **expression_dict):
+        if h5 is None:
+            with h5tbx.File(self.filename, 'r+') as h5:
+                return self.set_expression(h5=h5, **expression_dict)
+        for k, v in expression_dict.items():
+            curr_value = h5['LIBRARY/CEL/EXPRESSIONS'].attrs.get(k, None)
+            if curr_value is None:
+                raise KeyError(f'Could not identify expression name in HDF file: {k}')
+            h5['LIBRARY/CEL/EXPRESSIONS'].attrs[k] = v
+
+    def set_massflowrate(self,
+                         mfr: Union[float, str, Dict],
+                         flow_regime: str = 'Subsonic',
+                         mass_flow_rate_area: str = 'As Specified',
+                         turbulence_intensity: str = 'Low Intensity and Eddy Viscosity Ratio'):
+        """
+        Set the mass flow rate. Either set it with value and unit or provide an expression. If the latter,
+        then make sure you set the expression value using `.set_expression()`.
+
+        Parameters
+        ----------
+        mfr: Union[float, str, Dict]
+            Mass flow rate in kg/s or an expression. If an expression is provided, make sure to set the expression
+            value using `.set_expression()`.
+        flow_regime: str
+            Flow regime, e.g. 'Subsonic'
+        mass_flow_rate_area: str
+            Mass flow rate area, e.g. 'As Specified'
+        turbulence_intensity: str
+            Turbulence intensity. Options are:
+            - 'Low Intensity and Eddy Viscosity Ratio' or 'low'
+            - 'Medium Intensity and Eddy Viscosity Ratio' or 'medium'
+            - 'High Intensity and Eddy Viscosity Ratio' or 'high'
+
+        """
+        if 'low' in turbulence_intensity.lower():
+            turbulence_intensity = 'Low Intensity and Eddy Viscosity Ratio'
+        if 'medium' in turbulence_intensity.lower():
+            turbulence_intensity = 'Medium Intensity and Eddy Viscosity Ratio'
+        if 'high' in turbulence_intensity.lower():
+            turbulence_intensity = 'High Intensity and Eddy Viscosity Ratio'
+
+        with h5tbx.File(self.filename, 'r+') as h5:
+            bdry_grp = h5['FLOW: Flow Analysis 1'].find_one({'$basename': 'BOUNDARY: INLET'}, '$group')
+            if 'Use Profile Data' in bdry_grp:
+                del bdry_grp.attrs['Use Profile Data']
+
+            bdry_condition_grp = bdry_grp['BOUNDARY CONDITIONS']
+            bdry_condition_grp.create_group('FLOW REGIME',
+                                            attrs={'Option': flow_regime.capitalize()}, overwrite=True)
+            bdry_condition_grp.create_group('FLOW DIRECTION',
+                                            attrs={'Option': 'Normal to Boundary Condition'}, overwrite=True)
+            if isinstance(mfr, str):
+                # expecting an existing expression
+                bdry_condition_grp.create_group('MASS AND MOMENTUM', attrs={'Mass Flow Rate': mfr,
+                                                                            'Mass Flow Rate Area': mass_flow_rate_area,
+                                                                            'Option': 'Mass Flow Rate'},
+                                                overwrite=True)
+            elif isinstance(mfr, Dict):
+                if len(mfr) != 1:
+                    raise ValueError(f'Unexpected input: {mfr}. Expecting something like'
+                                     ' EXsetvolflowrate="0.01 [m^3/s]"')
+                self.set_expression(mfr)
+                expr_name = list(mfr.keys())[0]
+                bdry_condition_grp.create_group('MASS AND MOMENTUM', attrs={'Mass Flow Rate': expr_name,
+                                                                            'Mass Flow Rate Area': mass_flow_rate_area,
+                                                                            'Option': 'Mass Flow Rate'},
+                                                overwrite=True)
+            else:
+                bdry_condition_grp.create_group('MASS AND MOMENTUM', attrs={'Mass Flow Rate': f'{mfr} [kg s^-1]',
+                                                                            'Mass Flow Rate Area': mass_flow_rate_area,
+                                                                            'Option': 'Mass Flow Rate'},
+                                                overwrite=True)
+            bdry_condition_grp.create_group('TURBULENCE', attrs={'Option': turbulence_intensity}, overwrite=True)
+
+    def set_normalspeed(self,
+                        normal_speed,
+                         flow_regime: str = 'Subsonic',
+                        turbulence_intensity: str = 'Low Intensity and Eddy Viscosity Ratio'):
+        if 'low' in turbulence_intensity.lower():
+            turbulence_intensity = 'Low Intensity and Eddy Viscosity Ratio'
+        if 'medium' in turbulence_intensity.lower():
+            turbulence_intensity = 'Medium Intensity and Eddy Viscosity Ratio'
+        if 'high' in turbulence_intensity.lower():
+            turbulence_intensity = 'High Intensity and Eddy Viscosity Ratio'
+
+        with h5tbx.File(self.filename, 'r+') as h5:
+            bdry_grp = h5['FLOW: Flow Analysis 1'].find_one({'$basename': 'BOUNDARY: INLET'}, '$group')
+
+            bdry_condition_grp = bdry_grp['BOUNDARY CONDITIONS']
+            bdry_condition_grp.create_group('FLOW REGIME',
+                                            attrs={'Option': flow_regime.capitalize()}, overwrite=True)
+
+            bdry_condition_grp.create_group('MASS AND MOMENTUM', attrs={'Normal Speed': f'{normal_speed:f} [m s^-1]',
+                                                                        'Option': 'Normal Speed'},
+                                            overwrite=True)
+            if 'FLOW DIRECTION' in bdry_condition_grp:
+                del bdry_condition_grp['FLOW DIRECTION']
+
+            bdry_condition_grp.create_group('TURBULENCE', attrs={'Option': turbulence_intensity}, overwrite=True)
 
 
 def generate(input_file: PATHLIKE, ccl_filename: Union[PATHLIKE, None] = None,

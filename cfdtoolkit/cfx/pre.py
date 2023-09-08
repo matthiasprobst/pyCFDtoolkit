@@ -58,8 +58,8 @@ class CFXPre(CFXExe):
     def from_h5ccl(h5ccl_filename: pathlib.Path) -> "CFXPre":
         """Read from HDF5-ccl file"""
         h5ccl_filename = pathlib.Path(h5ccl_filename)
-        if h5ccl_filename.suffix not in ('.h5', '.hdf', '.hdf5'):
-            raise ValueError(f'Unexpected suffix. Expected .h5, .hdf or .hdf5 but not {h5ccl_filename.suffix}')
+        if h5ccl_filename.suffix not in ('.h5', '.hdf', '.hdf5', '.hdf_ccl'):
+            raise ValueError(f'Unexpected suffix. Expected .h5, .hdf, .hdf5 or .hdf_ccl but not {h5ccl_filename.suffix}')
         if not h5ccl_filename.exists():
             raise FileNotFoundError(f'CCL file not found: {h5ccl_filename}')
         ccl = CCLFile(h5ccl_filename)
@@ -72,5 +72,6 @@ class CFXPre(CFXExe):
         ccl_filename = pathlib.Path(ccl_filename)
         if not ccl_filename.exists():
             raise FileNotFoundError(f'CCL file not found: {ccl_filename}')
-        cfx_filename = importccl(change_suffix(ccl_filename, '.cfx'), ccl_filename)
+        cfx_filename = importccl(cfx_filename=change_suffix(ccl_filename, new_suffix='.cfx'),
+                                 ccl_filename=ccl_filename)
         return CFXPre(cfx_filename, None)

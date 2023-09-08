@@ -64,6 +64,13 @@ class CFXCase(CFXFile):
         """Number of result files"""
         return len(self.res_files)
 
+    @property
+    def ccl_filename(self):
+        ccl_filename = change_suffix(self.filename, new_suffix='.ccl')
+        if not ccl_filename.exists():
+            raise FileExistsError(f'CCL file does not exist: {ccl_filename}')
+        return ccl_filename
+
     @update_case
     def reset(self, include_def: bool = False, verbose: bool = False):
         """Deletes all result files and the definition file, so that only the .cfx file
